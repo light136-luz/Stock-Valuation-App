@@ -80,6 +80,7 @@
                 })
                 .then(overviewData => {
                     console.log('Overview Data:', overviewData);
+                    console.log('Enterprise Value Raw:', overviewData.EnterpriseValue);
                     if (overviewData.Note) {
                         throw new Error('API limit reached or invalid response.');
                     }
