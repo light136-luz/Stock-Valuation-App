@@ -56,10 +56,10 @@
                             if (cashFlowData.annualReports && cashFlowData.annualReports.length > 0) {
                                 const fcf = cashFlowData.annualReports[0].freeCashFlow || 'N/A';
                                 console.log('Cash Flow Data:', cashFlowData);
+                                console.log('Latest Annual Report:', cashFlowData.annualReports[0]);
                                 const priceToFCF = fcf !== 'N/A' ? (marketCap / fcf).toFixed(2) : 'N/A';
                                 const ev = overviewData.EnterpriseValue || 'N/A';
                                 const evFCF = fcf !== 'N/A' && ev !== 'N/A' ? (ev / fcf).toFixed(2) : 'N/A';
-
                                 document.getElementById('pe_ttm').innerText = `PE TTM: ${peTTM}`;
                                 document.getElementById('pe_forward').innerText = `PE Forward: ${peForward}`;
                                 document.getElementById('price_to_sales').innerText = `Price to Sales: ${priceToSales}`;
