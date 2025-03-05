@@ -73,19 +73,20 @@
 
             fetch(overviewUrl)
                 .then(response => {
-                    console.log(`OVERVIEW Response Status for ${symbol}: ${response.status}`);
+                    console.log(`OVERVIEW Status for ${symbol}: ${response.status}`);
                     if (!response.ok) {
                         throw new Error(`OVERVIEW failed: ${response.status}`);
                     }
                     return response.json();
                 })
                 .then(overviewData => {
-                    console.log('OVERVIEW Data:', overviewData);
+                    console.log('OVERVIEW Raw Data:', overviewData);
                     if (overviewData.Note) {
                         throw new Error('API limit reached');
                     }
-                    if (!overviewData.Symbol) {
-                        throw new Error('Invalid symbol returned by OVERVIEW');
+                    // Relaxed check: proceed if any key data exists, not just Symbol
+                    if (!overviewData.Symbol && !overviewData.TrailingPE) {
+                        throw new Error('No valid data returned by OVERVIEW');
                     }
 
                     const peTTM = overviewData.TrailingPE || 'N/A';
@@ -104,14 +105,14 @@
 
                     return fetch(cashFlowUrl)
                         .then(response => {
-                            console.log(`CASH_FLOW Response Status for ${symbol}: ${response.status}`);
+                            console.log(`CASH_FLOW Status for ${symbol}: ${response.status}`);
                             if (!response.ok) {
                                 throw new Error(`CASH_FLOW failed: ${response.status}`);
                             }
                             return response.json();
                         })
                         .then(cashFlowData => {
-                            console.log('CASH_FLOW Data:', cashFlowData);
+                            console.log('CASH_FLOW Raw Data:', cashFlowData);
                             let priceToFCF = 'N/A';
                             let evFCF = 'N/A';
 
@@ -134,8 +135,8 @@
                     console.error('Error Details:', error.message);
                     if (error.message.includes('API limit')) {
                         alert('API limit reached (5 requests/min). Wait a minute and try again.');
-                    } else if (error.message.includes('Invalid symbol')) {
-                        alert('API says invalid symbol. Check the ticker and try again.');
+                    } else if (error.message.includes('No valid data')) {
+                        alert('API returned no usable data for this symbol.');
                     } else {
                         alert(`Error: ${error.message}. Check console for details.`);
                     }
