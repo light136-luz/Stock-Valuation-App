@@ -3,81 +3,150 @@
 <head>
     <title>Stock Valuation App</title>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        .metric-card { 
+            background-color: #f8f9fa; 
+            padding: 15px; 
+            border-radius: 8px; 
+            margin-bottom: 10px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
+        }
+        .loading { display: none; text-align: center; margin-top: 20px; }
+        .btn:disabled { opacity: 0.6; }
+    </style>
 </head>
 <body>
     <div class="container">
-        <h1 class="mt-4">Stock Valuation Metrics</h1>
-        <div class="row mt-4">
+        <h1 class="mt-4 text-center">Stock Valuation Metrics</h1>
+        <div class="row mt-4 justify-content-center">
             <div class="col-md-4">
                 <label for="symbol">Enter Stock Symbol:</label>
                 <input type="text" id="symbol" class="form-control" placeholder="e.g., AAPL">
             </div>
             <div class="col-md-2">
-                <button onclick="fetchData()" class="btn btn-primary mt-4">Fetch Data</button>
+                <button id="fetchBtn" onclick="fetchData()" class="btn btn-primary mt-4">Fetch Data</button>
             </div>
         </div>
         <div class="row mt-4">
-            <div class="col-md-6">
+            <div class="col-md-6 mx-auto">
+                <div id="loading" class="loading">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p>Loading...</p>
+                </div>
                 <h3>Valuation Metrics</h3>
-                <p id="pe_ttm"></p>
-                <p id="pe_forward"></p>
-                <p id="price_to_sales"></p>
-                <p id="price_to_book"></p>
-                <p id="ev_ebitda"></p>
-                <p id="price_to_fcf"></p>
-                <p id="ev_fcf"></p>
+                <div id="results">
+                    <div id="pe_ttm" class="metric-card"></div>
+                    <div id="pe_forward" class="metric-card"></div>
+                    <div id="price_to_sales" class="metric-card"></div>
+                    <div id="price_to_book" class="metric-card"></div>
+                    <div id="ev_ebitda" class="metric-card"></div>
+                    <div id="price_to_fcf" class="metric-card"></div>
+                    <div id="ev_fcf" class="metric-card"></div>
+                </div>
             </div>
         </div>
     </div>
     <script>
+        let isFetching = false;
+
         function fetchData() {
-            const symbol = document.getElementById('symbol').value;
+            if (isFetching) {
+                alert('Please wait a moment before fetching again.');
+                return;
+            }
+
+            const symbol = document.getElementById('symbol').value.trim().toUpperCase();
+            if (!symbol) {
+                alert('Please enter a stock symbol!');
+                return;
+            }
+
             const apikey = 'EUIL8JU2T0UFCZRR';  // Replace with your Alpha Vantage API key
             const overviewUrl = `https://www.alphavantage.co/query?function=OVERVIEW&symbol=${symbol}&apikey=${apikey}`;
             const cashFlowUrl = `https://www.alphavantage.co/query?function=CASH_FLOW&symbol=${symbol}&apikey=${apikey}`;
+            const fetchBtn = document.getElementById('fetchBtn');
+
+            document.getElementById('loading').style.display = 'block';
+            fetchBtn.disabled = true;
+            isFetching = true;
+            clearResults();
 
             fetch(overviewUrl)
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Overview fetch failed with status: ${response.status}`);
+                    }
+                    return response.json();
+                })
                 .then(overviewData => {
-                    if (overviewData.Note || !overviewData.Symbol) {
-                        alert('Invalid symbol or API limit reached. Try again later.');
-                        return;
+                    console.log('Overview Data:', overviewData);
+                    if (overviewData.Note) {
+                        throw new Error('API limit reached or invalid response.');
+                    }
+                    if (!overviewData.Symbol) {
+                        throw new Error('Invalid stock symbol.');
                     }
                     const peTTM = overviewData.TrailingPE || 'N/A';
                     const peForward = overviewData.ForwardPE || 'N/A';
                     const priceToSales = overviewData.PriceToSalesRatioTTM || 'N/A';
                     const priceToBook = overviewData.PriceToBookRatio || 'N/A';
                     const evEbitda = overviewData.EVToEBITDA || 'N/A';
-                    const marketCap = overviewData.MarketCapitalization || 'N/A';
+                    const marketCap = parseFloat(overviewData.MarketCapitalization) || 0;
+                    const ev = parseFloat(overviewData.EnterpriseValue) || 0;
+
+                    document.getElementById('pe_ttm').innerText = `PE TTM: ${peTTM}`;
+                    document.getElementById('pe_forward').innerText = `PE Forward: ${peForward}`;
+                    document.getElementById('price_to_sales').innerText = `Price to Sales: ${priceToSales}`;
+                    document.getElementById('price_to_book').innerText = `Price to Book: ${priceToBook}`;
+                    document.getElementById('ev_ebitda').innerText = `EV / EBITDA: ${evEbitda}`;
 
                     return fetch(cashFlowUrl)
-                        .then(response => response.json())
-                        .then(cashFlowData => {
-                            if (cashFlowData.annualReports && cashFlowData.annualReports.length > 0) {
-                                const fcf = cashFlowData.annualReports[0].freeCashFlow || 'N/A';
-                                console.log('Cash Flow Data:', cashFlowData);
-                                console.log('Latest Annual Report:', cashFlowData.annualReports[0]);
-                                const priceToFCF = fcf !== 'N/A' ? (marketCap / fcf).toFixed(2) : 'N/A';
-                                const ev = overviewData.EnterpriseValue || 'N/A';
-                                const evFCF = fcf !== 'N/A' && ev !== 'N/A' ? (ev / fcf).toFixed(2) : 'N/A';
-                                document.getElementById('pe_ttm').innerText = `PE TTM: ${peTTM}`;
-                                document.getElementById('pe_forward').innerText = `PE Forward: ${peForward}`;
-                                document.getElementById('price_to_sales').innerText = `Price to Sales: ${priceToSales}`;
-                                document.getElementById('price_to_book').innerText = `Price to Book: ${priceToBook}`;
-                                document.getElementById('ev_ebitda').innerText = `EV / EBITDA: ${evEbitda}`;
-                                document.getElementById('price_to_fcf').innerText = `Price to FCF: ${priceToFCF}`;
-                                document.getElementById('ev_fcf').innerText = `EV / FCF: ${evFCF}`;
-                            } else {
-                                alert('No cash flow data available for this symbol.');
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error(`Cash Flow fetch failed with status: ${response.status}`);
                             }
+                            return response.json();
+                        })
+                        .then(cashFlowData => {
+                            console.log('Cash Flow Data:', cashFlowData);
+                            console.log('Latest Annual Report:', cashFlowData.annualReports[0]);
+                            let priceToFCF = 'N/A';
+                            let evFCF = 'N/A';
+
+                            if (cashFlowData.annualReports && cashFlowData.annualReports.length > 0) {
+                                const fcfRaw = cashFlowData.annualReports[0].operatingCashflow || '0';
+                                const fcf = parseFloat(fcfRaw.replace(/[^0-9.-]/g, '')) || 0;
+                                if (fcf && marketCap) {
+                                    priceToFCF = (marketCap / fcf).toFixed(2);
+                                }
+                                if (fcf && ev) {
+                                    evFCF = (ev / fcf).toFixed(2);
+                                }
+                            }
+
+                            document.getElementById('price_to_fcf').innerText = `Price to FCF: ${priceToFCF}`;
+                            document.getElementById('ev_fcf').innerText = `EV / FCF: ${evFCF}`;
                         });
                 })
                 .catch(error => {
-                    alert('An error occurred. Check your internet or try again.');
-                    console.error('Error:', error);
+                    console.error('Fetch Error:', error);
+                    alert(error.message === 'API limit reached or invalid response.' 
+                        ? 'API limit reached (5 requests/min). Wait a minute and try again.' 
+                        : 'Error fetching data. Check symbol, API key, or connection.');
+                })
+                .finally(() => {
+                    document.getElementById('loading').style.display = 'none';
+                    fetchBtn.disabled = false;
+                    setTimeout(() => { isFetching = false; }, 15000); // 15-sec cooldown
                 });
+        }
+
+        function clearResults() {
+            const resultElements = ['pe_ttm', 'pe_forward', 'price_to_sales', 'price_to_book', 'ev_ebitda', 'price_to_fcf', 'ev_fcf'];
+            resultElements.forEach(id => {
+                document.getElementById(id).innerText = '';
+            });
         }
     </script>
 </body>
-
 </html>
