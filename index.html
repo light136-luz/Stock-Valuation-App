@@ -61,7 +61,7 @@
                 return;
             }
 
-            const apikey = 'EUIL8JU2T0UFCZRR';  // Replace with your Alpha Vantage API key
+            const apikey = 'EUIL8JU2T0UFCZRR';  // Your API key inserted
             const overviewUrl = `https://www.alphavantage.co/query?function=OVERVIEW&symbol=${symbol}&apikey=${apikey}`;
             const cashFlowUrl = `https://www.alphavantage.co/query?function=CASH_FLOW&symbol=${symbol}&apikey=${apikey}`;
             const fetchBtn = document.getElementById('fetchBtn');
@@ -74,19 +74,19 @@
             fetch(overviewUrl)
                 .then(response => {
                     if (!response.ok) {
-                        throw new Error(`Overview fetch failed with status: ${response.status}`);
+                        throw new Error(`Overview failed: ${response.status}`);
                     }
                     return response.json();
                 })
                 .then(overviewData => {
                     console.log('Overview Data:', overviewData);
-                    console.log('Enterprise Value Raw:', overviewData.EnterpriseValue);
                     if (overviewData.Note) {
-                        throw new Error('API limit reached or invalid response.');
+                        throw new Error('API limit reached');
                     }
                     if (!overviewData.Symbol) {
-                        throw new Error('Invalid stock symbol.');
+                        throw new Error('Invalid symbol');
                     }
+
                     const peTTM = overviewData.TrailingPE || 'N/A';
                     const peForward = overviewData.ForwardPE || 'N/A';
                     const priceToSales = overviewData.PriceToSalesRatioTTM || 'N/A';
@@ -104,19 +104,18 @@
                     return fetch(cashFlowUrl)
                         .then(response => {
                             if (!response.ok) {
-                                throw new Error(`Cash Flow fetch failed with status: ${response.status}`);
+                                throw new Error(`Cash Flow failed: ${response.status}`);
                             }
                             return response.json();
                         })
                         .then(cashFlowData => {
                             console.log('Cash Flow Data:', cashFlowData);
-                            console.log('Latest Annual Report:', cashFlowData.annualReports[0]);
                             let priceToFCF = 'N/A';
                             let evFCF = 'N/A';
 
                             if (cashFlowData.annualReports && cashFlowData.annualReports.length > 0) {
                                 const fcfRaw = cashFlowData.annualReports[0].operatingCashflow || '0';
-                                const fcf = parseFloat(fcfRaw.replace(/[^0-9.-]/g, '')) || 0;
+                                const fcf = parseFloat(fcfRaw) || 0;
                                 if (fcf && marketCap) {
                                     priceToFCF = (marketCap / fcf).toFixed(2);
                                 }
@@ -130,10 +129,14 @@
                         });
                 })
                 .catch(error => {
-                    console.error('Fetch Error:', error);
-                    alert(error.message === 'API limit reached or invalid response.' 
-                        ? 'API limit reached (5 requests/min). Wait a minute and try again.' 
-                        : 'Error fetching data. Check symbol, API key, or connection.');
+                    console.error('Error:', error.message);
+                    if (error.message.includes('API limit')) {
+                        alert('API limit reached (5 requests/min). Wait a minute and try again.');
+                    } else if (error.message.includes('Invalid symbol')) {
+                        alert('Invalid stock symbol. Try another (e.g., AAPL).');
+                    } else {
+                        alert(`Fetch error: ${error.message}. Check internet or try again.`);
+                    }
                 })
                 .finally(() => {
                     document.getElementById('loading').style.display = 'none';
