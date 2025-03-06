@@ -81,6 +81,7 @@
                 })
                 .then(overviewData => {
                     console.log('OVERVIEW Raw Data:', overviewData);
+                    console.log('MarketCap:', overviewData.MarketCapitalization, 'EnterpriseValue:', overviewData.EnterpriseValue);
                     if (overviewData.Information || overviewData.Note) {
                         throw new Error('API rate limit exceeded');
                     }
@@ -112,6 +113,7 @@
                         })
                         .then(cashFlowData => {
                             console.log('CASH_FLOW Raw Data:', cashFlowData);
+                            console.log('OperatingCashflow:', cashFlowData.annualReports[0].operatingCashflow);
                             let priceToFCF = 'N/A';
                             let evFCF = 'N/A';
 
