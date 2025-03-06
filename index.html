@@ -13,6 +13,7 @@
         }
         .loading { display: none; text-align: center; margin-top: 20px; }
         .btn:disabled { opacity: 0.6; }
+        .section-title { margin-top: 20px; }
     </style>
 </head>
 <body>
@@ -34,7 +35,7 @@
                     <p>Loading...</p>
                 </div>
                 <h3>Valuation Metrics</h3>
-                <div id="results">
+                <div id="valuation-results">
                     <div id="pe_ttm" class="metric-card"></div>
                     <div id="pe_forward" class="metric-card"></div>
                     <div id="price_to_sales" class="metric-card"></div>
@@ -43,11 +44,40 @@
                     <div id="price_to_fcf" class="metric-card"></div>
                     <div id="ev_fcf" class="metric-card"></div>
                 </div>
+                <h3 class="section-title">Growth Metrics</h3>
+                <div id="growth-results">
+                    <div id="sales_growth_1yr" class="metric-card"></div>
+                    <div id="sales_growth_3yr" class="metric-card"></div>
+                    <div id="sales_growth_5yr" class="metric-card"></div>
+                    <div id="eps_growth_1yr" class="metric-card"></div>
+                    <div id="eps_growth_3yr" class="metric-card"></div>
+                    <div id="eps_growth_5yr" class="metric-card"></div>
+                    <div id="ebitda_growth_1yr" class="metric-card"></div>
+                    <div id="ebitda_growth_3yr" class="metric-card"></div>
+                    <div id="ebitda_growth_5yr" class="metric-card"></div>
+                </div>
             </div>
         </div>
     </div>
     <script>
         let isFetching = false;
+
+        function calculateGrowthRate(current, previous) {
+            if (!current || !previous || previous === 0) return 'N/A';
+            return (((current - previous) / previous) * 100).toFixed(2) + '%';
+        }
+
+        function calculateAvgGrowth(data, years, field) {
+            if (data.length < years + 1) return 'N/A';
+            let totalGrowth = 0;
+            for (let i = 0; i < years; i++) {
+                const current = parseFloat(data[i][field]) || 0;
+                const previous = parseFloat(data[i + 1][field]) || 0;
+                if (previous === 0) return 'N/A';
+                totalGrowth += (current - previous) / previous;
+            }
+            return ((totalGrowth / years) * 100).toFixed(2) + '%';
+        }
 
         function fetchData() {
             if (isFetching) {
@@ -65,6 +95,7 @@
             const overviewUrl = `https://www.alphavantage.co/query?function=OVERVIEW&symbol=${symbol}&apikey=${apikey}`;
             const cashFlowUrl = `https://www.alphavantage.co/query?function=CASH_FLOW&symbol=${symbol}&apikey=${apikey}`;
             const balanceSheetUrl = `https://www.alphavantage.co/query?function=BALANCE_SHEET&symbol=${symbol}&apikey=${apikey}`;
+            const incomeStatementUrl = `https://www.alphavantage.co/query?function=INCOME_STATEMENT&symbol=${symbol}&apikey=${apikey}`;
             const fetchBtn = document.getElementById('fetchBtn');
 
             document.getElementById('loading').style.display = 'block';
@@ -75,19 +106,13 @@
             fetch(overviewUrl)
                 .then(response => {
                     console.log(`OVERVIEW Status for ${symbol}: ${response.status}`);
-                    if (!response.ok) {
-                        throw new Error(`OVERVIEW failed: ${response.status}`);
-                    }
+                    if (!response.ok) throw new Error(`OVERVIEW failed: ${response.status}`);
                     return response.json();
                 })
                 .then(overviewData => {
                     console.log('OVERVIEW Raw Data:', overviewData);
-                    if (overviewData.Information || overviewData.Note) {
-                        throw new Error('API rate limit exceeded');
-                    }
-                    if (Object.keys(overviewData).length === 0) {
-                        throw new Error('No data returned by OVERVIEW');
-                    }
+                    if (overviewData.Information || overviewData.Note) throw new Error('API rate limit exceeded');
+                    if (Object.keys(overviewData).length === 0) throw new Error('No data returned by OVERVIEW');
 
                     const peTTM = overviewData.TrailingPE || 'N/A';
                     const peForward = overviewData.ForwardPE || 'N/A';
@@ -95,6 +120,7 @@
                     const priceToBook = overviewData.PriceToBookRatio || 'N/A';
                     const evEbitda = overviewData.EVToEBITDA || 'N/A';
                     const marketCap = parseFloat(overviewData.MarketCapitalization) || 0;
+                    const sharesOutstanding = parseFloat(overviewData.SharesOutstanding) || 0;
 
                     document.getElementById('pe_ttm').innerText = `PE TTM: ${peTTM}`;
                     document.getElementById('pe_forward').innerText = `PE Forward: ${peForward}`;
@@ -102,92 +128,80 @@
                     document.getElementById('price_to_book').innerText = `Price to Book: ${priceToBook}`;
                     document.getElementById('ev_ebitda').innerText = `EV / EBITDA: ${evEbitda}`;
 
-                    // Fetch BALANCE_SHEET for Debt and Cash
-                    return fetch(balanceSheetUrl)
-                        .then(response => {
-                            console.log(`BALANCE_SHEET Status for ${symbol}: ${response.status}`);
-                            if (!response.ok) {
-                                throw new Error(`BALANCE_SHEET failed: ${response.status}`);
+                    return Promise.all([
+                        fetch(balanceSheetUrl)
+                            .then(response => {
+                                console.log(`BALANCE_SHEET Status for ${symbol}: ${response.status}`);
+                                if (!response.ok) throw new Error(`BALANCE_SHEET failed: ${response.status}`);
+                                return response.json();
+                            }),
+                        fetch(cashFlowUrl)
+                            .then(response => {
+                                console.log(`CASH_FLOW Status for ${symbol}: ${response.status}`);
+                                if (!response.ok) throw new Error(`CASH_FLOW failed: ${response.status}`);
+                                return response.json();
+                            }),
+                        fetch(incomeStatementUrl)
+                            .then(response => {
+                                console.log(`INCOME_STATEMENT Status for ${symbol}: ${response.status}`);
+                                if (!response.ok) throw new Error(`INCOME_STATEMENT failed: ${response.status}`);
+                                return response.json();
+                            })
+                    ]).then(([balanceSheetData, cashFlowData, incomeStatementData]) => {
+                        // BALANCE_SHEET Processing
+                        console.log('BALANCE_SHEET Raw Data:', balanceSheetData);
+                        if (balanceSheetData.Information || balanceSheetData.Note) throw new Error('API rate limit exceeded');
+                        if (!balanceSheetData.annualReports || balanceSheetData.annualReports.length === 0) throw new Error('No balance sheet data returned');
+
+                        const latestBalance = balanceSheetData.annualReports[0];
+                        const longTermDebt = parseFloat(latestBalance.longTermDebt) || 0;
+                        const shortTermDebt = parseFloat(latestBalance.shortLongTermDebtTotal) || 0;
+                        const cash = parseFloat(latestBalance.cashAndCashEquivalentsAtCarryingValue) || 0;
+                        const totalDebt = longTermDebt + shortTermDebt;
+                        const ev = marketCap + totalDebt - cash;
+
+                        console.log('MarketCap:', marketCap);
+                        console.log('LongTermDebt:', longTermDebt);
+                        console.log('ShortTermDebt:', shortTermDebt);
+                        console.log('TotalDebt:', totalDebt);
+                        console.log('Cash:', cash);
+                        console.log('Calculated EV:', ev);
+
+                        // CASH_FLOW Processing
+                        console.log('CASH_FLOW Raw Data:', cashFlowData);
+                        let priceToFCF = 'N/A';
+                        let evFCF = 'N/A';
+
+                        if (cashFlowData.annualReports && cashFlowData.annualReports.length > 0) {
+                            const fcfRaw = cashFlowData.annualReports[0].operatingCashflow || '0';
+                            const fcf = parseFloat(fcfRaw) || 0;
+                            console.log('OperatingCashflow:', fcf);
+                            if (fcf && marketCap) {
+                                priceToFCF = (marketCap / fcf).toFixed(2);
                             }
-                            return response.json();
-                        })
-                        .then(balanceSheetData => {
-                            console.log('BALANCE_SHEET Raw Data:', balanceSheetData);
-                            if (balanceSheetData.Information || balanceSheetData.Note) {
-                                throw new Error('API rate limit exceeded');
+                            if (fcf && ev) {
+                                evFCF = (ev / fcf).toFixed(2);
                             }
-                            if (!balanceSheetData.annualReports || balanceSheetData.annualReports.length === 0) {
-                                throw new Error('No balance sheet data returned');
-                            }
+                        }
 
-                            const latestBalance = balanceSheetData.annualReports[0];
-                            const longTermDebt = parseFloat(latestBalance.longTermDebt) || 0;
-                            const shortTermDebt = parseFloat(latestBalance.shortLongTermDebtTotal) || 0; // Fallback if specific short-term debt missing
-                            const cash = parseFloat(latestBalance.cashAndCashEquivalentsAtCarryingValue) || 0;
-                            const totalDebt = longTermDebt + shortTermDebt;
-                            const ev = marketCap + totalDebt - cash;
+                        document.getElementById('price_to_fcf').innerText = `Price to FCF: ${priceToFCF}`;
+                        document.getElementById('ev_fcf').innerText = `EV / FCF: ${evFCF}`;
 
-                            console.log('MarketCap:', marketCap);
-                            console.log('LongTermDebt:', longTermDebt);
-                            console.log('ShortTermDebt:', shortTermDebt);
-                            console.log('TotalDebt:', totalDebt);
-                            console.log('Cash:', cash);
-                            console.log('Calculated EV:', ev);
+                        // INCOME_STATEMENT Processing
+                        console.log('INCOME_STATEMENT Raw Data:', incomeStatementData);
+                        if (incomeStatementData.Information || incomeStatementData.Note) throw new Error('API rate limit exceeded');
+                        if (!incomeStatementData.annualReports || incomeStatementData.annualReports.length < 5) {
+                            console.warn('Not enough income statement data for 5-year growth');
+                        }
 
-                            // Fetch CASH_FLOW for FCF
-                            return fetch(cashFlowUrl)
-                                .then(response => {
-                                    console.log(`CASH_FLOW Status for ${symbol}: ${response.status}`);
-                                    if (!response.ok) {
-                                        throw new Error(`CASH_FLOW failed: ${response.status}`);
-                                    }
-                                    return response.json();
-                                })
-                                .then(cashFlowData => {
-                                    console.log('CASH_FLOW Raw Data:', cashFlowData);
-                                    let priceToFCF = 'N/A';
-                                    let evFCF = 'N/A';
+                        const reports = incomeStatementData.annualReports || [];
+                        const sales = reports.map(r => parseFloat(r.totalRevenue) || 0);
+                        const netIncome = reports.map(r => parseFloat(r.netIncome) || 0);
+                        const ebitda = reports.map(r => parseFloat(r.ebitda) || (parseFloat(r.operatingIncome) + parseFloat(r.depreciationAndAmortization)) || 0);
+                        const eps = sharesOutstanding ? netIncome.map((ni, i) => ni / sharesOutstanding) : [];
 
-                                    if (cashFlowData.annualReports && cashFlowData.annualReports.length > 0) {
-                                        const fcfRaw = cashFlowData.annualReports[0].operatingCashflow || '0';
-                                        const fcf = parseFloat(fcfRaw) || 0;
-                                        console.log('OperatingCashflow:', fcf);
-                                        if (fcf && marketCap) {
-                                            priceToFCF = (marketCap / fcf).toFixed(2);
-                                        }
-                                        if (fcf && ev) {
-                                            evFCF = (ev / fcf).toFixed(2);
-                                        }
-                                    }
-
-                                    document.getElementById('price_to_fcf').innerText = `Price to FCF: ${priceToFCF}`;
-                                    document.getElementById('ev_fcf').innerText = `EV / FCF: ${evFCF}`;
-                                });
-                        });
-                })
-                .catch(error => {
-                    console.error('Error Details:', error.message);
-                    if (error.message.includes('rate limit')) {
-                        alert('API rate limit exceeded (25 requests/day). Wait until tomorrow or upgrade at alphavantage.co/premium.');
-                    } else if (error.message.includes('No data')) {
-                        alert('API returned no usable data for this symbol.');
-                    } else {
-                        alert(`Error: ${error.message}. Check console for details.`);
-                    }
-                })
-                .finally(() => {
-                    document.getElementById('loading').style.display = 'none';
-                    fetchBtn.disabled = false;
-                    setTimeout(() => { isFetching = false; }, 15000); // 15-sec cooldown
-                });
-        }
-
-        function clearResults() {
-            const resultElements = ['pe_ttm', 'pe_forward', 'price_to_sales', 'price_to_book', 'ev_ebitda', 'price_to_fcf', 'ev_fcf'];
-            resultElements.forEach(id => {
-                document.getElementById(id).innerText = '';
-            });
-        }
-    </script>
-</body>
-</html>
+                        document.getElementById('sales_growth_1yr').innerText = `Sales Growth 1-Yr: ${calculateGrowthRate(sales[0], sales[1])}`;
+                        document.getElementById('sales_growth_3yr').innerText = `Sales Growth 3-Yr Avg: ${calculateAvgGrowth(reports, 3, 'totalRevenue')}`;
+                        document.getElementById('sales_growth_5yr').innerText = `Sales Growth 5-Yr Avg: ${calculateAvgGrowth(reports, 5, 'totalRevenue')}`;
+                        document.getElementById('eps_growth_1yr').innerText = `EPS Growth 1-Yr: ${calculateGrowthRate(eps[0], eps[1])}`;
+                        document.getElementById('eps_growth_3yr').innerText = `EPS Growth 3-Yr Avg: ${calculateAvgGrowth(reports.map((r, i) => ({
