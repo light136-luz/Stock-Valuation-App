@@ -204,4 +204,41 @@
                         document.getElementById('sales_growth_3yr').innerText = `Sales Growth 3-Yr Avg: ${calculateAvgGrowth(reports, 3, 'totalRevenue')}`;
                         document.getElementById('sales_growth_5yr').innerText = `Sales Growth 5-Yr Avg: ${calculateAvgGrowth(reports, 5, 'totalRevenue')}`;
                         document.getElementById('eps_growth_1yr').innerText = `EPS Growth 1-Yr: ${calculateGrowthRate(eps[0], eps[1])}`;
-                        document.getElementById('eps_growth_3yr').innerText = `EPS Growth 3-Yr Avg: ${calculateAvgGrowth(reports.map((r, i) => ({
+                        document.getElementById('eps_growth_3yr').innerText = `EPS Growth 3-Yr Avg: ${calculateAvgGrowth(reports.map((r, i) => ({ eps: eps[i] })), 3, 'eps')}`;
+                        document.getElementById('eps_growth_5yr').innerText = `EPS Growth 5-Yr Avg: ${calculateAvgGrowth(reports.map((r, i) => ({ eps: eps[i] })), 5, 'eps')}`;
+                        document.getElementById('ebitda_growth_1yr').innerText = `EBITDA Growth 1-Yr: ${calculateGrowthRate(ebitda[0], ebitda[1])}`;
+                        document.getElementById('ebitda_growth_3yr').innerText = `EBITDA Growth 3-Yr Avg: ${calculateAvgGrowth(reports, 3, 'ebitda')}`;
+                        document.getElementById('ebitda_growth_5yr').innerText = `EBITDA Growth 5-Yr Avg: ${calculateAvgGrowth(reports, 5, 'ebitda')}`;
+                    });
+                })
+                .catch(error => {
+                    console.error('Error Details:', error.message);
+                    if (error.message.includes('rate limit')) {
+                        alert('API rate limit exceeded (25 requests/day). Wait until tomorrow or upgrade at alphavantage.co/premium.');
+                    } else if (error.message.includes('No data')) {
+                        alert('API returned no usable data for this symbol.');
+                    } else {
+                        alert(`Error: ${error.message}. Check console for details.`);
+                    }
+                })
+                .finally(() => {
+                    document.getElementById('loading').style.display = 'none';
+                    fetchBtn.disabled = false;
+                    setTimeout(() => { isFetching = false; }, 15000);
+                });
+        }
+
+        function clearResults() {
+            const resultElements = [
+                'pe_ttm', 'pe_forward', 'price_to_sales', 'price_to_book', 'ev_ebitda', 'price_to_fcf', 'ev_fcf',
+                'sales_growth_1yr', 'sales_growth_3yr', 'sales_growth_5yr',
+                'eps_growth_1yr', 'eps_growth_3yr', 'eps_growth_5yr',
+                'ebitda_growth_1yr', 'ebitda_growth_3yr', 'ebitda_growth_5yr'
+            ];
+            resultElements.forEach(id => {
+                document.getElementById(id).innerText = '';
+            });
+        }
+    </script>
+</body>
+</html>
