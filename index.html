@@ -81,7 +81,8 @@
                 })
                 .then(overviewData => {
                     console.log('OVERVIEW Raw Data:', overviewData);
-                    console.log('MarketCap:', overviewData.MarketCapitalization, 'EnterpriseValue:', overviewData.EnterpriseValue);
+                    console.log('MarketCap:', overviewData.MarketCapitalization);
+                    console.log('EnterpriseValue:', overviewData.EnterpriseValue);
                     if (overviewData.Information || overviewData.Note) {
                         throw new Error('API rate limit exceeded');
                     }
@@ -95,7 +96,8 @@
                     const priceToBook = overviewData.PriceToBookRatio || 'N/A';
                     const evEbitda = overviewData.EVToEBITDA || 'N/A';
                     const marketCap = parseFloat(overviewData.MarketCapitalization) || 0;
-                    const ev = parseFloat(overviewData.EnterpriseValue) || 0;
+                    // Use MarketCap as fallback if EnterpriseValue is missing (temporary)
+                    const ev = parseFloat(overviewData.EnterpriseValue) || marketCap;
 
                     document.getElementById('pe_ttm').innerText = `PE TTM: ${peTTM}`;
                     document.getElementById('pe_forward').innerText = `PE Forward: ${peForward}`;
