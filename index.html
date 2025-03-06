@@ -10,6 +10,7 @@
             border-radius: 8px; 
             margin-bottom: 10px; 
             box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
+            cursor: pointer; 
         }
         .loading { display: none; text-align: center; margin-top: 20px; }
         .btn:disabled { opacity: 0.6; }
@@ -36,31 +37,54 @@
                 </div>
                 <h3>Valuation Metrics</h3>
                 <div id="valuation-results">
-                    <div id="pe_ttm" class="metric-card"></div>
-                    <div id="pe_forward" class="metric-card"></div>
-                    <div id="price_to_sales" class="metric-card"></div>
-                    <div id="price_to_book" class="metric-card"></div>
-                    <div id="ev_ebitda" class="metric-card"></div>
-                    <div id="price_to_fcf" class="metric-card"></div>
-                    <div id="ev_fcf" class="metric-card"></div>
+                    <div id="pe_ttm" class="metric-card" onclick="showDetails('pe_ttm')"></div>
+                    <div id="pe_forward" class="metric-card" onclick="showDetails('pe_forward')"></div>
+                    <div id="price_to_sales" class="metric-card" onclick="showDetails('price_to_sales')"></div>
+                    <div id="price_to_book" class="metric-card" onclick="showDetails('price_to_book')"></div>
+                    <div id="ev_ebitda" class="metric-card" onclick="showDetails('ev_ebitda')"></div>
+                    <div id="price_to_fcf" class="metric-card" onclick="showDetails('price_to_fcf')"></div>
+                    <div id="ev_fcf" class="metric-card" onclick="showDetails('ev_fcf')"></div>
                 </div>
                 <h3 class="section-title">Growth Metrics</h3>
                 <div id="growth-results">
-                    <div id="sales_growth_1yr" class="metric-card"></div>
-                    <div id="sales_growth_3yr" class="metric-card"></div>
-                    <div id="sales_growth_5yr" class="metric-card"></div>
-                    <div id="eps_growth_1yr" class="metric-card"></div>
-                    <div id="eps_growth_3yr" class="metric-card"></div>
-                    <div id="eps_growth_5yr" class="metric-card"></div>
-                    <div id="ebitda_growth_1yr" class="metric-card"></div>
-                    <div id="ebitda_growth_3yr" class="metric-card"></div>
-                    <div id="ebitda_growth_5yr" class="metric-card"></div>
+                    <div id="sales_growth_1yr" class="metric-card" onclick="showDetails('sales_growth_1yr')"></div>
+                    <div id="sales_growth_3yr" class="metric-card" onclick="showDetails('sales_growth_3yr')"></div>
+                    <div id="sales_growth_5yr" class="metric-card" onclick="showDetails('sales_growth_5yr')"></div>
+                    <div id="eps_growth_1yr" class="metric-card" onclick="showDetails('eps_growth_1yr')"></div>
+                    <div id="eps_growth_3yr" class="metric-card" onclick="showDetails('eps_growth_3yr')"></div>
+                    <div id="eps_growth_5yr" class="metric-card" onclick="showDetails('eps_growth_5yr')"></div>
+                    <div id="ebitda_growth_1yr" class="metric-card" onclick="showDetails('ebitda_growth_1yr')"></div>
+                    <div id="ebitda_growth_3yr" class="metric-card" onclick="showDetails('ebitda_growth_3yr')"></div>
+                    <div id="ebitda_growth_5yr" class="metric-card" onclick="showDetails('ebitda_growth_5yr')"></div>
                 </div>
             </div>
         </div>
     </div>
+
+    <!-- Bootstrap Modal -->
+    <div class="modal fade" id="metricModal" tabindex="-1" role="dialog" aria-labelledby="metricModalLabel" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="metricModalLabel">Metric Details</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body" id="metricDetails"></div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
     <script>
         let isFetching = false;
+        let metricDetails = {};
 
         function calculateGrowthRate(current, previous) {
             if (!current || !previous || previous === 0) return 'N/A';
@@ -70,13 +94,24 @@
         function calculateAvgGrowth(data, years, field) {
             if (data.length < years + 1) return 'N/A';
             let totalGrowth = 0;
+            let details = [];
             for (let i = 0; i < years; i++) {
                 const current = parseFloat(data[i][field]) || 0;
                 const previous = parseFloat(data[i + 1][field]) || 0;
                 if (previous === 0) return 'N/A';
-                totalGrowth += (current - previous) / previous;
+                const growth = (current - previous) / previous;
+                totalGrowth += growth;
+                details.push(`${data[i].fiscalDateEnding}: ${(growth * 100).toFixed(2)}% (Current: ${current}, Previous: ${previous})`);
             }
-            return ((totalGrowth / years) * 100).toFixed(2) + '%';
+            const avg = ((totalGrowth / years) * 100).toFixed(2) + '%';
+            return { value: avg, details: details.join('<br>') };
+        }
+
+        function showDetails(metricId) {
+            const details = metricDetails[metricId] || 'No details available.';
+            document.getElementById('metricModalLabel').innerText = document.getElementById(metricId).innerText.split(':')[0] + ' Details';
+            document.getElementById('metricDetails').innerHTML = details;
+            $('#metricModal').modal('show');
         }
 
         function fetchData() {
@@ -120,6 +155,12 @@
                     const priceToBook = overviewData.PriceToBookRatio || 'N/A';
                     const evEbitda = overviewData.EVToEBITDA || 'N/A';
                     const marketCap = parseFloat(overviewData.MarketCapitalization) || 0;
+
+                    metricDetails['pe_ttm'] = `Trailing PE: ${peTTM}`;
+                    metricDetails['pe_forward'] = `Forward PE: ${peForward}`;
+                    metricDetails['price_to_sales'] = `Price to Sales TTM: ${priceToSales}`;
+                    metricDetails['price_to_book'] = `Price to Book: ${priceToBook}`;
+                    metricDetails['ev_ebitda'] = `EV / EBITDA: ${evEbitda}`;
 
                     document.getElementById('pe_ttm').innerText = `PE TTM: ${peTTM}`;
                     document.getElementById('pe_forward').innerText = `PE Forward: ${peForward}`;
@@ -177,9 +218,11 @@
                             console.log('OperatingCashflow:', fcf);
                             if (fcf && marketCap) {
                                 priceToFCF = (marketCap / fcf).toFixed(2);
+                                metricDetails['price_to_fcf'] = `Price to FCF: ${priceToFCF}<br>Market Cap: ${marketCap}<br>Free Cash Flow: ${fcf}`;
                             }
                             if (fcf && ev) {
                                 evFCF = (ev / fcf).toFixed(2);
+                                metricDetails['ev_fcf'] = `EV / FCF: ${evFCF}<br>Enterprise Value: ${ev} (MarketCap: ${marketCap} + Total Debt: ${totalDebt} - Cash: ${cash})<br>Free Cash Flow: ${fcf}`;
                             }
                         }
 
@@ -199,7 +242,7 @@
                             const matchingBalance = balanceReports.find(b => b.fiscalDateEnding === income.fiscalDateEnding) || {};
                             const netIncome = parseFloat(income.netIncome) || 0;
                             const shares = parseFloat(matchingBalance.commonStockSharesOutstanding) || parseFloat(overviewData.SharesOutstanding) || 0;
-                            return shares ? { eps: netIncome / shares, fiscalDateEnding: income.fiscalDateEnding } : { eps: 0, fiscalDateEnding: income.fiscalDateEnding };
+                            return shares ? { eps: netIncome / shares, fiscalDateEnding: income.fiscalDateEnding, netIncome, shares } : { eps: 0, fiscalDateEnding: income.fiscalDateEnding, netIncome, shares: 0 };
                         });
 
                         console.log('EPS Data:', epsData);
@@ -207,15 +250,39 @@
                         const sales = incomeReports.map(r => parseFloat(r.totalRevenue) || 0);
                         const ebitda = incomeReports.map(r => parseFloat(r.ebitda) || (parseFloat(r.operatingIncome) + parseFloat(r.depreciationAndAmortization)) || 0);
 
-                        document.getElementById('sales_growth_1yr').innerText = `Sales Growth 1-Yr: ${calculateGrowthRate(sales[0], sales[1])}`;
-                        document.getElementById('sales_growth_3yr').innerText = `Sales Growth 3-Yr Avg: ${calculateAvgGrowth(incomeReports, 3, 'totalRevenue')}`;
-                        document.getElementById('sales_growth_5yr').innerText = `Sales Growth 5-Yr Avg: ${calculateAvgGrowth(incomeReports, 5, 'totalRevenue')}`;
-                        document.getElementById('eps_growth_1yr').innerText = `EPS Growth 1-Yr: ${calculateGrowthRate(epsData[0].eps, epsData[1].eps)}`;
-                        document.getElementById('eps_growth_3yr').innerText = `EPS Growth 3-Yr Avg: ${calculateAvgGrowth(epsData, 3, 'eps')}`;
-                        document.getElementById('eps_growth_5yr').innerText = `EPS Growth 5-Yr Avg: ${calculateAvgGrowth(epsData, 5, 'eps')}`;
-                        document.getElementById('ebitda_growth_1yr').innerText = `EBITDA Growth 1-Yr: ${calculateGrowthRate(ebitda[0], ebitda[1])}`;
-                        document.getElementById('ebitda_growth_3yr').innerText = `EBITDA Growth 3-Yr Avg: ${calculateAvgGrowth(incomeReports, 3, 'ebitda')}`;
-                        document.getElementById('ebitda_growth_5yr').innerText = `EBITDA Growth 5-Yr Avg: ${calculateAvgGrowth(incomeReports, 5, 'ebitda')}`;
+                        // Sales Growth
+                        const sales1Yr = calculateGrowthRate(sales[0], sales[1]);
+                        const sales3Yr = calculateAvgGrowth(incomeReports, 3, 'totalRevenue');
+                        const sales5Yr = calculateAvgGrowth(incomeReports, 5, 'totalRevenue');
+                        metricDetails['sales_growth_1yr'] = `Sales Growth 1-Yr: ${sales1Yr}<br>Current (${incomeReports[0].fiscalDateEnding}): ${sales[0]}<br>Previous (${incomeReports[1].fiscalDateEnding}): ${sales[1]}`;
+                        metricDetails['sales_growth_3yr'] = `Sales Growth 3-Yr Avg: ${sales3Yr.value}<br>${sales3Yr.details}`;
+                        metricDetails['sales_growth_5yr'] = `Sales Growth 5-Yr Avg: ${sales5Yr.value}<br>${sales5Yr.details}`;
+
+                        // EPS Growth
+                        const eps1Yr = calculateGrowthRate(epsData[0].eps, epsData[1].eps);
+                        const eps3Yr = calculateAvgGrowth(epsData, 3, 'eps');
+                        const eps5Yr = calculateAvgGrowth(epsData, 5, 'eps');
+                        metricDetails['eps_growth_1yr'] = `EPS Growth 1-Yr: ${eps1Yr}<br>${epsData[0].fiscalDateEnding}: ${epsData[0].eps.toFixed(2)} (Net Income: ${epsData[0].netIncome}, Shares: ${epsData[0].shares})<br>${epsData[1].fiscalDateEnding}: ${epsData[1].eps.toFixed(2)} (Net Income: ${epsData[1].netIncome}, Shares: ${epsData[1].shares})`;
+                        metricDetails['eps_growth_3yr'] = `EPS Growth 3-Yr Avg: ${eps3Yr.value}<br>${eps3Yr.details}`;
+                        metricDetails['eps_growth_5yr'] = `EPS Growth 5-Yr Avg: ${eps5Yr.value}<br>${eps5Yr.details}`;
+
+                        // EBITDA Growth
+                        const ebitda1Yr = calculateGrowthRate(ebitda[0], ebitda[1]);
+                        const ebitda3Yr = calculateAvgGrowth(incomeReports, 3, 'ebitda');
+                        const ebitda5Yr = calculateAvgGrowth(incomeReports, 5, 'ebitda');
+                        metricDetails['ebitda_growth_1yr'] = `EBITDA Growth 1-Yr: ${ebitda1Yr}<br>Current (${incomeReports[0].fiscalDateEnding}): ${ebitda[0]}<br>Previous (${incomeReports[1].fiscalDateEnding}): ${ebitda[1]}`;
+                        metricDetails['ebitda_growth_3yr'] = `EBITDA Growth 3-Yr Avg: ${ebitda3Yr.value}<br>${ebitda3Yr.details}`;
+                        metricDetails['ebitda_growth_5yr'] = `EBITDA Growth 5-Yr Avg: ${ebitda5Yr.value}<br>${ebitda5Yr.details}`;
+
+                        document.getElementById('sales_growth_1yr').innerText = `Sales Growth 1-Yr: ${sales1Yr}`;
+                        document.getElementById('sales_growth_3yr').innerText = `Sales Growth 3-Yr Avg: ${sales3Yr.value}`;
+                        document.getElementById('sales_growth_5yr').innerText = `Sales Growth 5-Yr Avg: ${sales5Yr.value}`;
+                        document.getElementById('eps_growth_1yr').innerText = `EPS Growth 1-Yr: ${eps1Yr}`;
+                        document.getElementById('eps_growth_3yr').innerText = `EPS Growth 3-Yr Avg: ${eps3Yr.value}`;
+                        document.getElementById('eps_growth_5yr').innerText = `EPS Growth 5-Yr Avg: ${eps5Yr.value}`;
+                        document.getElementById('ebitda_growth_1yr').innerText = `EBITDA Growth 1-Yr: ${ebitda1Yr}`;
+                        document.getElementById('ebitda_growth_3yr').innerText = `EBITDA Growth 3-Yr Avg: ${ebitda3Yr.value}`;
+                        document.getElementById('ebitda_growth_5yr').innerText = `EBITDA Growth 5-Yr Avg: ${ebitda5Yr.value}`;
                     });
                 })
                 .catch(error => {
@@ -245,6 +312,7 @@
             resultElements.forEach(id => {
                 document.getElementById(id).innerText = '';
             });
+            metricDetails = {};
         }
     </script>
 </body>
