@@ -120,7 +120,6 @@
                     const priceToBook = overviewData.PriceToBookRatio || 'N/A';
                     const evEbitda = overviewData.EVToEBITDA || 'N/A';
                     const marketCap = parseFloat(overviewData.MarketCapitalization) || 0;
-                    const sharesOutstanding = parseFloat(overviewData.SharesOutstanding) || 0;
 
                     document.getElementById('pe_ttm').innerText = `PE TTM: ${peTTM}`;
                     document.getElementById('pe_forward').innerText = `PE Forward: ${peForward}`;
@@ -187,28 +186,36 @@
                         document.getElementById('price_to_fcf').innerText = `Price to FCF: ${priceToFCF}`;
                         document.getElementById('ev_fcf').innerText = `EV / FCF: ${evFCF}`;
 
-                        // INCOME_STATEMENT Processing
+                        // INCOME_STATEMENT and BALANCE_SHEET for EPS Growth
                         console.log('INCOME_STATEMENT Raw Data:', incomeStatementData);
                         if (incomeStatementData.Information || incomeStatementData.Note) throw new Error('API rate limit exceeded');
                         if (!incomeStatementData.annualReports || incomeStatementData.annualReports.length < 5) {
                             console.warn('Not enough income statement data for 5-year growth');
                         }
 
-                        const reports = incomeStatementData.annualReports || [];
-                        const sales = reports.map(r => parseFloat(r.totalRevenue) || 0);
-                        const netIncome = reports.map(r => parseFloat(r.netIncome) || 0);
-                        const ebitda = reports.map(r => parseFloat(r.ebitda) || (parseFloat(r.operatingIncome) + parseFloat(r.depreciationAndAmortization)) || 0);
-                        const eps = sharesOutstanding ? netIncome.map((ni, i) => ni / sharesOutstanding) : [];
+                        const incomeReports = incomeStatementData.annualReports || [];
+                        const balanceReports = balanceSheetData.annualReports || [];
+                        const epsData = incomeReports.map((income, i) => {
+                            const matchingBalance = balanceReports.find(b => b.fiscalDateEnding === income.fiscalDateEnding) || {};
+                            const netIncome = parseFloat(income.netIncome) || 0;
+                            const shares = parseFloat(matchingBalance.commonStockSharesOutstanding) || parseFloat(overviewData.SharesOutstanding) || 0;
+                            return shares ? { eps: netIncome / shares, fiscalDateEnding: income.fiscalDateEnding } : { eps: 0, fiscalDateEnding: income.fiscalDateEnding };
+                        });
+
+                        console.log('EPS Data:', epsData);
+
+                        const sales = incomeReports.map(r => parseFloat(r.totalRevenue) || 0);
+                        const ebitda = incomeReports.map(r => parseFloat(r.ebitda) || (parseFloat(r.operatingIncome) + parseFloat(r.depreciationAndAmortization)) || 0);
 
                         document.getElementById('sales_growth_1yr').innerText = `Sales Growth 1-Yr: ${calculateGrowthRate(sales[0], sales[1])}`;
-                        document.getElementById('sales_growth_3yr').innerText = `Sales Growth 3-Yr Avg: ${calculateAvgGrowth(reports, 3, 'totalRevenue')}`;
-                        document.getElementById('sales_growth_5yr').innerText = `Sales Growth 5-Yr Avg: ${calculateAvgGrowth(reports, 5, 'totalRevenue')}`;
-                        document.getElementById('eps_growth_1yr').innerText = `EPS Growth 1-Yr: ${calculateGrowthRate(eps[0], eps[1])}`;
-                        document.getElementById('eps_growth_3yr').innerText = `EPS Growth 3-Yr Avg: ${calculateAvgGrowth(reports.map((r, i) => ({ eps: eps[i] })), 3, 'eps')}`;
-                        document.getElementById('eps_growth_5yr').innerText = `EPS Growth 5-Yr Avg: ${calculateAvgGrowth(reports.map((r, i) => ({ eps: eps[i] })), 5, 'eps')}`;
+                        document.getElementById('sales_growth_3yr').innerText = `Sales Growth 3-Yr Avg: ${calculateAvgGrowth(incomeReports, 3, 'totalRevenue')}`;
+                        document.getElementById('sales_growth_5yr').innerText = `Sales Growth 5-Yr Avg: ${calculateAvgGrowth(incomeReports, 5, 'totalRevenue')}`;
+                        document.getElementById('eps_growth_1yr').innerText = `EPS Growth 1-Yr: ${calculateGrowthRate(epsData[0].eps, epsData[1].eps)}`;
+                        document.getElementById('eps_growth_3yr').innerText = `EPS Growth 3-Yr Avg: ${calculateAvgGrowth(epsData, 3, 'eps')}`;
+                        document.getElementById('eps_growth_5yr').innerText = `EPS Growth 5-Yr Avg: ${calculateAvgGrowth(epsData, 5, 'eps')}`;
                         document.getElementById('ebitda_growth_1yr').innerText = `EBITDA Growth 1-Yr: ${calculateGrowthRate(ebitda[0], ebitda[1])}`;
-                        document.getElementById('ebitda_growth_3yr').innerText = `EBITDA Growth 3-Yr Avg: ${calculateAvgGrowth(reports, 3, 'ebitda')}`;
-                        document.getElementById('ebitda_growth_5yr').innerText = `EBITDA Growth 5-Yr Avg: ${calculateAvgGrowth(reports, 5, 'ebitda')}`;
+                        document.getElementById('ebitda_growth_3yr').innerText = `EBITDA Growth 3-Yr Avg: ${calculateAvgGrowth(incomeReports, 3, 'ebitda')}`;
+                        document.getElementById('ebitda_growth_5yr').innerText = `EBITDA Growth 5-Yr Avg: ${calculateAvgGrowth(incomeReports, 5, 'ebitda')}`;
                     });
                 })
                 .catch(error => {
