@@ -236,4 +236,109 @@ function fetchData() {
         metricDetails['gross_margin_3yr_change'] = `Gross Margin 3-Yr Change: ${grossMargin3Yr}<br>Current (${incomeReports[0].fiscalDateEnding}): ${grossMargins[0] ? grossMargins[0].toFixed(2) : 0}%<br>3-Yr Ago (${incomeReports[2].fiscalDateEnding}): ${grossMargins[2] ? grossMargins[2].toFixed(2) : 0}%`;
         metricDetails['gross_margin_5yr_change'] = `Gross Margin 5-Yr Change: ${grossMargin5Yr}<br>Current (${incomeReports[0].fiscalDateEnding}): ${grossMargins[0] ? grossMargins[0].toFixed(2) : 0}%<br>5-Yr Ago (${incomeReports[4].fiscalDateEnding}): ${grossMargins[4] ? grossMargins[4].toFixed(2) : 0}%`;
 
-        const operatingMargin = operatingMargins[0] ? operatingMargins[0].
+        const operatingMargin = operatingMargins[0] ? operatingMargins[0].toFixed(2) + '%' : 'N/A';
+        const operatingMargin1Yr = calculateMarginChange(operatingMargins[0], operatingMargins[1], 1);
+        const operatingMargin3Yr = calculateMarginChange(operatingMargins[0], operatingMargins[2], 3);
+        const operatingMargin5Yr = calculateMarginChange(operatingMargins[0], operatingMargins[4], 5);
+        metricDetails['operating_margin'] = `Operating Margin: ${operatingMargin}<br>Operating Income (${incomeReports[0].fiscalDateEnding}): ${operatingIncome[0]}<br>Revenue (${incomeReports[0].fiscalDateEnding}): ${revenue[0]}`;
+        metricDetails['operating_margin_1yr_change'] = `Operating Margin 1-Yr Change: ${operatingMargin1Yr}<br>Current (${incomeReports[0].fiscalDateEnding}): ${operatingMargins[0] ? operatingMargins[0].toFixed(2) : 0}%<br>Previous (${incomeReports[1].fiscalDateEnding}): ${operatingMargins[1] ? operatingMargins[1].toFixed(2) : 0}%`;
+        metricDetails['operating_margin_3yr_change'] = `Operating Margin 3-Yr Change: ${operatingMargin3Yr}<br>Current (${incomeReports[0].fiscalDateEnding}): ${operatingMargins[0] ? operatingMargins[0].toFixed(2) : 0}%<br>3-Yr Ago (${incomeReports[2].fiscalDateEnding}): ${operatingMargins[2] ? operatingMargins[2].toFixed(2) : 0}%`;
+        metricDetails['operating_margin_5yr_change'] = `Operating Margin 5-Yr Change: ${operatingMargin5Yr}<br>Current (${incomeReports[0].fiscalDateEnding}): ${operatingMargins[0] ? operatingMargins[0].toFixed(2) : 0}%<br>5-Yr Ago (${incomeReports[4].fiscalDateEnding}): ${operatingMargins[4] ? operatingMargins[4].toFixed(2) : 0}%`;
+
+        const netMargin = netMargins[0] ? netMargins[0].toFixed(2) + '%' : 'N/A';
+        const netMargin1Yr = calculateMarginChange(netMargins[0], netMargins[1], 1);
+        const netMargin3Yr = calculateMarginChange(netMargins[0], netMargins[2], 3);
+        const netMargin5Yr = calculateMarginChange(netMargins[0], netMargins[4], 5);
+        metricDetails['net_margin'] = `Net Margin: ${netMargin}<br>Net Income (${incomeReports[0].fiscalDateEnding}): ${netIncome[0]}<br>Revenue (${incomeReports[0].fiscalDateEnding}): ${revenue[0]}`;
+        metricDetails['net_margin_1yr_change'] = `Net Margin 1-Yr Change: ${netMargin1Yr}<br>Current (${incomeReports[0].fiscalDateEnding}): ${netMargins[0] ? netMargins[0].toFixed(2) : 0}%<br>Previous (${incomeReports[1].fiscalDateEnding}): ${netMargins[1] ? netMargins[1].toFixed(2) : 0}%`;
+        metricDetails['net_margin_3yr_change'] = `Net Margin 3-Yr Change: ${netMargin3Yr}<br>Current (${incomeReports[0].fiscalDateEnding}): ${netMargins[0] ? netMargins[0].toFixed(2) : 0}%<br>3-Yr Ago (${incomeReports[2].fiscalDateEnding}): ${netMargins[2] ? netMargins[2].toFixed(2) : 0}%`;
+        metricDetails['net_margin_5yr_change'] = `Net Margin 5-Yr Change: ${netMargin5Yr}<br>Current (${incomeReports[0].fiscalDateEnding}): ${netMargins[0] ? netMargins[0].toFixed(2) : 0}%<br>5-Yr Ago (${incomeReports[4].fiscalDateEnding}): ${netMargins[4] ? netMargins[4].toFixed(2) : 0}%`;
+
+        document.getElementById('gross_margin').innerText = `Gross Margin: ${grossMargin}`;
+        document.getElementById('gross_margin_1yr_change').innerText = `Gross Margin 1-Yr Change: ${grossMargin1Yr.split(' ')[0]}`;
+        document.getElementById('gross_margin_3yr_change').innerText = `Gross Margin 3-Yr Change: ${grossMargin3Yr.split(' ')[0]}`;
+        document.getElementById('gross_margin_5yr_change').innerText = `Gross Margin 5-Yr Change: ${grossMargin5Yr.split(' ')[0]}`;
+        document.getElementById('operating_margin').innerText = `Operating Margin: ${operatingMargin}`;
+        document.getElementById('operating_margin_1yr_change').innerText = `Operating Margin 1-Yr Change: ${operatingMargin1Yr.split(' ')[0]}`;
+        document.getElementById('operating_margin_3yr_change').innerText = `Operating Margin 3-Yr Change: ${operatingMargin3Yr.split(' ')[0]}`;
+        document.getElementById('operating_margin_5yr_change').innerText = `Operating Margin 5-Yr Change: ${operatingMargin5Yr.split(' ')[0]}`;
+        document.getElementById('net_margin').innerText = `Net Margin: ${netMargin}`;
+        document.getElementById('net_margin_1yr_change').innerText = `Net Margin 1-Yr Change: ${netMargin1Yr.split(' ')[0]}`;
+        document.getElementById('net_margin_3yr_change').innerText = `Net Margin 3-Yr Change: ${netMargin3Yr.split(' ')[0]}`;
+        document.getElementById('net_margin_5yr_change').innerText = `Net Margin 5-Yr Change: ${netMargin5Yr.split(' ')[0]}`;
+
+        // Technical Metrics (TIME_SERIES_DAILY)
+        if (dailyData['Error Message']) throw new Error('Daily data error');
+        const timeSeries = dailyData['Time Series (Daily)'] || {};
+        const dates = Object.keys(timeSeries).sort().reverse();
+        const closes = dates.map(date => parseFloat(timeSeries[date]['4. close']) || 0);
+        const highs = dates.map(date => parseFloat(timeSeries[date]['2. high']) || 0);
+        const lows = dates.map(date => parseFloat(timeSeries[date]['3. low']) || 0);
+        const volumes = dates.map(date => parseFloat(timeSeries[date]['5. volume']) || 0);
+
+        const currentPrice = closes[0];
+        const rsi = calculateRSI(closes);
+        const mfi = calculateMFI(highs, lows, closes, volumes);
+        const yearHigh = Math.max(...closes.slice(0, 252)); // ~1 year of trading days
+        const yearLow = Math.min(...closes.slice(0, 252));
+        const priceVs52WkHigh = ((currentPrice / yearHigh) * 100 - 100).toFixed(2) + '%';
+        const priceVs52WkLow = ((currentPrice / yearLow) * 100 - 100).toFixed(2) + '%';
+        const bollinger20 = calculateBollingerPercent(closes, 20);
+        const bollinger50 = calculateBollingerPercent(closes, 50);
+        const sma50 = calculateSMA(closes, 50);
+        const sma200 = calculateSMA(closes, 200);
+        const priceVs50DayAvg = sma50 ? ((currentPrice / sma50) * 100 - 100).toFixed(2) + '%' : 'N/A';
+        const priceVs200DayAvg = sma200 ? ((currentPrice / sma200) * 100 - 100).toFixed(2) + '%' : 'N/A';
+
+        metricDetails['rsi'] = `RSI: ${rsi}<br>Based on 14-day closing prices: ${closes.slice(0, 14).join(', ')}`;
+        metricDetails['mfi'] = `MFI: ${mfi}<br>Based on 14-day H/L/C/Vol: Highs: ${highs.slice(0, 14).join(', ')}<br>Lows: ${lows.slice(0, 14).join(', ')}<br>Closes: ${closes.slice(0, 14).join(', ')}<br>Volumes: ${volumes.slice(0, 14).join(', ')}`;
+        metricDetails['price_vs_52wk_high'] = `Price vs 52-Wk High: ${priceVs52WkHigh}<br>Current Price: ${currentPrice}<br>52-Wk High: ${yearHigh}`;
+        metricDetails['price_vs_52wk_low'] = `Price vs 52-Wk Low: ${priceVs52WkLow}<br>Current Price: ${currentPrice}<br>52-Wk Low: ${yearLow}`;
+        metricDetails['bollinger_percent_20'] = `Bollinger Percent 20: ${bollinger20}<br>Based on 20-day prices: ${closes.slice(0, 20).join(', ')}`;
+        metricDetails['bollinger_percent_50'] = `Bollinger Percent 50: ${bollinger50}<br>Based on 50-day prices: ${closes.slice(0, 50).join(', ')}`;
+        metricDetails['price_vs_50day_avg'] = `Price vs 50-Day Avg: ${priceVs50DayAvg}<br>Current Price: ${currentPrice}<br>50-Day SMA: ${sma50.toFixed(2)}`;
+        metricDetails['price_vs_200day_avg'] = `Price vs 200-Day Avg: ${priceVs200DayAvg}<br>Current Price: ${currentPrice}<br>200-Day SMA: ${sma200.toFixed(2)}`;
+
+        document.getElementById('rsi').innerText = `RSI: ${rsi}`;
+        document.getElementById('mfi').innerText = `MFI: ${mfi}`;
+        document.getElementById('price_vs_52wk_high').innerText = `Price vs 52-Wk High: ${priceVs52WkHigh}`;
+        document.getElementById('price_vs_52wk_low').innerText = `Price vs 52-Wk Low: ${priceVs52WkLow}`;
+        document.getElementById('bollinger_percent_20').innerText = `Bollinger Percent 20: ${bollinger20}`;
+        document.getElementById('bollinger_percent_50').innerText = `Bollinger Percent 50: ${bollinger50}`;
+        document.getElementById('price_vs_50day_avg').innerText = `Price vs 50-Day Avg: ${priceVs50DayAvg}`;
+        document.getElementById('price_vs_200day_avg').innerText = `Price vs 200-Day Avg: ${priceVs200DayAvg}`;
+    })
+    .catch(error => {
+        console.error('Error Details:', error.message);
+        if (error.message.includes('rate limit')) {
+            alert('API rate limit exceeded (25 requests/day). Wait until tomorrow or upgrade at alphavantage.co/premium.');
+        } else if (error.message.includes('No data')) {
+            alert('API returned no usable data for this symbol.');
+        } else {
+            alert(`Error: ${error.message}. Check console for details.`);
+        }
+    })
+    .finally(() => {
+        document.getElementById('loading').style.display = 'none';
+        fetchBtn.disabled = false;
+        setTimeout(() => { isFetching = false; }, 15000);
+    });
+}
+
+function clearResults() {
+    const resultElements = [
+        'pe_ttm', 'pe_forward', 'price_to_sales', 'price_to_book', 'ev_ebitda', 'price_to_fcf', 'ev_fcf',
+        'sales_growth_1yr', 'sales_growth_3yr', 'sales_growth_5yr',
+        'eps_growth_1yr', 'eps_growth_3yr', 'eps_growth_5yr',
+        'ebitda_growth_1yr', 'ebitda_growth_3yr', 'ebitda_growth_5yr',
+        'gross_margin', 'gross_margin_1yr_change', 'gross_margin_3yr_change', 'gross_margin_5yr_change',
+        'operating_margin', 'operating_margin_1yr_change', 'operating_margin_3yr_change', 'operating_margin_5yr_change',
+        'net_margin', 'net_margin_1yr_change', 'net_margin_3yr_change', 'net_margin_5yr_change',
+        'rsi', 'mfi', 'price_vs_52wk_high', 'price_vs_52wk_low',
+        'bollinger_percent_20', 'bollinger_percent_50', 'price_vs_50day_avg', 'price_vs_200day_avg'
+    ];
+    resultElements.forEach(id => {
+        document.getElementById(id).innerText = '';
+    });
+    metricDetails = {};
+}
