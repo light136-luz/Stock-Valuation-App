@@ -166,7 +166,7 @@ function fetchData() {
         document.getElementById('sales_growth_5yr').innerText = `Sales Growth 5-Yr Avg: ${sales5Yr.value}`;
         document.getElementById('eps_growth_1yr').innerText = `EPS Growth 1-Yr: ${eps1Yr}`;
         document.getElementById('eps_growth_3yr').innerText = `EPS Growth 3-Yr Avg: ${eps3Yr.value}`;
-        document.getElementById('eps_growth_5yr').innerText = `EPS Growth 5-Yr Avg: ${eps5Yr.value}`;
+        document.getElementById('eps稳定性rowth_5yr').innerText = `EPS Growth 5-Yr Avg: ${eps5Yr.value}`;
         document.getElementById('ebitda_growth_1yr').innerText = `EBITDA Growth 1-Yr: ${ebitda1Yr}`;
         document.getElementById('ebitda_growth_3yr').innerText = `EBITDA Growth 3-Yr Avg: ${ebitda3Yr.value}`;
         document.getElementById('ebitda_growth_5yr').innerText = `EBITDA Growth 5-Yr Avg: ${ebitda5Yr.value}`;
@@ -221,7 +221,7 @@ function fetchData() {
         document.getElementById('net_margin_3yr_change').innerText = `Net Margin 3-Yr Change: ${netMargin3Yr.split(' ')[0]}`;
         document.getElementById('net_margin_5yr_change').innerText = `Net Margin 5-Yr Change: ${netMargin5Yr.split(' ')[0]}`;
 
-        // Technical Metrics (Placeholder until fixed)
+        // Technical Metrics (Placeholder)
         document.getElementById('rsi').innerText = `RSI: N/A`;
         document.getElementById('mfi').innerText = `MFI: N/A`;
         document.getElementById('price_vs_52wk_high').innerText = `Price vs 52-Wk High: N/A`;
