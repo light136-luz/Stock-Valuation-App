@@ -206,4 +206,56 @@ function fetchData() {
         metricDetails['net_margin'] = `Net Margin: ${netMargin}<br>Net Income (${incomeReports[0].fiscalDateEnding}): ${netIncome[0]}<br>Revenue (${incomeReports[0].fiscalDateEnding}): ${revenue[0]}`;
         metricDetails['net_margin_1yr_change'] = `Net Margin 1-Yr Change: ${netMargin1Yr}<br>Current (${incomeReports[0].fiscalDateEnding}): ${netMargins[0] ? netMargins[0].toFixed(2) : 0}%<br>Previous (${incomeReports[1].fiscalDateEnding}): ${netMargins[1] ? netMargins[1].toFixed(2) : 0}%`;
         metricDetails['net_margin_3yr_change'] = `Net Margin 3-Yr Change: ${netMargin3Yr}<br>Current (${incomeReports[0].fiscalDateEnding}): ${netMargins[0] ? netMargins[0].toFixed(2) : 0}%<br>3-Yr Ago (${incomeReports[2].fiscalDateEnding}): ${netMargins[2] ? netMargins[2].toFixed(2) : 0}%`;
-        metricDetails['net_margin_5yr_change'] = `Net Margin 5-Y
+        metricDetails['net_margin_5yr_change'] = `Net Margin 5-Yr Change: ${netMargin5Yr}<br>Current (${incomeReports[0].fiscalDateEnding}): ${netMargins[0] ? netMargins[0].toFixed(2) : 0}%<br>5-Yr Ago (${incomeReports[4].fiscalDateEnding}): ${netMargins[4] ? netMargins[4].toFixed(2) : 0}%`;
+
+        document.getElementById('gross_margin').innerText = `Gross Margin: ${grossMargin}`;
+        document.getElementById('gross_margin_1yr_change').innerText = `Gross Margin 1-Yr Change: ${grossMargin1Yr.split(' ')[0]}`;
+        document.getElementById('gross_margin_3yr_change').innerText = `Gross Margin 3-Yr Change: ${grossMargin3Yr.split(' ')[0]}`;
+        document.getElementById('gross_margin_5yr_change').innerText = `Gross Margin 5-Yr Change: ${grossMargin5Yr.split(' ')[0]}`;
+        document.getElementById('operating_margin').innerText = `Operating Margin: ${operatingMargin}`;
+        document.getElementById('operating_margin_1yr_change').innerText = `Operating Margin 1-Yr Change: ${operatingMargin1Yr.split(' ')[0]}`;
+        document.getElementById('operating_margin_3yr_change').innerText = `Operating Margin 3-Yr Change: ${operatingMargin3Yr.split(' ')[0]}`;
+        document.getElementById('operating_margin_5yr_change').innerText = `Operating Margin 5-Yr Change: ${operatingMargin5Yr.split(' ')[0]}`;
+        document.getElementById('net_margin').innerText = `Net Margin: ${netMargin}`;
+        document.getElementById('net_margin_1yr_change').innerText = `Net Margin 1-Yr Change: ${netMargin1Yr.split(' ')[0]}`;
+        document.getElementById('net_margin_3yr_change').innerText = `Net Margin 3-Yr Change: ${netMargin3Yr.split(' ')[0]}`;
+        document.getElementById('net_margin_5yr_change').innerText = `Net Margin 5-Yr Change: ${netMargin5Yr.split(' ')[0]}`;
+
+        // Technical Metrics (Placeholder until fixed)
+        document.getElementById('rsi').innerText = `RSI: N/A`;
+        document.getElementById('mfi').innerText = `MFI: N/A`;
+        document.getElementById('price_vs_52wk_high').innerText = `Price vs 52-Wk High: N/A`;
+        document.getElementById('price_vs_52wk_low').innerText = `Price vs 52-Wk Low: N/A`;
+        document.getElementById('bollinger_percent_20').innerText = `Bollinger Percent 20: N/A`;
+        document.getElementById('bollinger_percent_50').innerText = `Bollinger Percent 50: N/A`;
+        document.getElementById('price_vs_50day_avg').innerText = `Price vs 50-Day Avg: N/A`;
+        document.getElementById('price_vs_200day_avg').innerText = `Price vs 200-Day Avg: N/A`;
+    })
+    .catch(error => {
+        console.error('Error Details:', error.message);
+        alert(`Error: ${error.message}. Check console for details.`);
+    })
+    .finally(() => {
+        document.getElementById('loading').style.display = 'none';
+        fetchBtn.disabled = false;
+        setTimeout(() => { isFetching = false; }, 15000);
+    });
+}
+
+function clearResults() {
+    const resultElements = [
+        'pe_ttm', 'pe_forward', 'price_to_sales', 'price_to_book', 'ev_ebitda', 'price_to_fcf', 'ev_fcf',
+        'sales_growth_1yr', 'sales_growth_3yr', 'sales_growth_5yr',
+        'eps_growth_1yr', 'eps_growth_3yr', 'eps_growth_5yr',
+        'ebitda_growth_1yr', 'ebitda_growth_3yr', 'ebitda_growth_5yr',
+        'gross_margin', 'gross_margin_1yr_change', 'gross_margin_3yr_change', 'gross_margin_5yr_change',
+        'operating_margin', 'operating_margin_1yr_change', 'operating_margin_3yr_change', 'operating_margin_5yr_change',
+        'net_margin', 'net_margin_1yr_change', 'net_margin_3yr_change', 'net_margin_5yr_change',
+        'rsi', 'mfi', 'price_vs_52wk_high', 'price_vs_52wk_low',
+        'bollinger_percent_20', 'bollinger_percent_50', 'price_vs_50day_avg', 'price_vs_200day_avg'
+    ];
+    resultElements.forEach(id => {
+        document.getElementById(id).innerText = '';
+    });
+    metricDetails = {};
+}
