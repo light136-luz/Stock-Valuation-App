@@ -28,50 +28,6 @@ function calculateMarginChange(currentMargin, pastMargin, yearsBack) {
     return `${change}% (${yearsBack}-Yr Change: Current ${currentMargin.toFixed(2)}% - Past ${pastMargin.toFixed(2)}%)`;
 }
 
-function calculateRSI(prices) {
-    if (prices.length < 15) return 'N/A';
-    let gains = 0, losses = 0;
-    for (let i = 1; i < 14; i++) {
-        const diff = prices[i] - prices[i + 1];
-        if (diff > 0) gains += diff;
-        else losses += Math.abs(diff);
-    }
-    const avgGain = gains / 14;
-    const avgLoss = losses / 14;
-    const rs = avgGain / (avgLoss || 1); // Avoid division by zero
-    return (100 - (100 / (1 + rs))).toFixed(2);
-}
-
-function calculateMFI(highs, lows, closes, volumes) {
-    if (highs.length < 15) return 'N/A';
-    let positiveMF = 0, negativeMF = 0;
-    for (let i = 0; i < 14; i++) {
-        const typicalPrice = (highs[i] + lows[i] + closes[i]) / 3;
-        const prevTypicalPrice = (highs[i + 1] + lows[i + 1] + closes[i + 1]) / 3;
-        const moneyFlow = typicalPrice * volumes[i];
-        if (typicalPrice > prevTypicalPrice) positiveMF += moneyFlow;
-        else if (typicalPrice < prevTypicalPrice) negativeMF += moneyFlow;
-    }
-    const mfr = positiveMF / (negativeMF || 1); // Avoid division by zero
-    return (100 - (100 / (1 + mfr))).toFixed(2);
-}
-
-function calculateBollingerPercent(prices, period) {
-    if (prices.length < period) return 'N/A';
-    const sma = prices.slice(0, period).reduce((a, b) => a + b, 0) / period;
-    const variance = prices.slice(0, period).reduce((a, b) => a + Math.pow(b - sma, 2), 0) / period;
-    const stdDev = Math.sqrt(variance);
-    const upperBand = sma + 2 * stdDev;
-    const lowerBand = sma - 2 * stdDev;
-    const currentPrice = prices[0];
-    return (((currentPrice - lowerBand) / (upperBand - lowerBand)) * 100).toFixed(2) + '%';
-}
-
-function calculateSMA(prices, period) {
-    if (prices.length < period) return 0;
-    return prices.slice(0, period).reduce((a, b) => a + b, 0) / period;
-}
-
 function showDetails(metricId) {
     const details = metricDetails[metricId] || 'No details available.';
     document.getElementById('metricModalLabel').innerText = document.getElementById(metricId).innerText.split(':')[0] + ' Details';
@@ -96,7 +52,6 @@ function fetchData() {
     const cashFlowUrl = `https://www.alphavantage.co/query?function=CASH_FLOW&symbol=${symbol}&apikey=${apikey}`;
     const balanceSheetUrl = `https://www.alphavantage.co/query?function=BALANCE_SHEET&symbol=${symbol}&apikey=${apikey}`;
     const incomeStatementUrl = `https://www.alphavantage.co/query?function=INCOME_STATEMENT&symbol=${symbol}&apikey=${apikey}`;
-    const dailyUrl = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&outputsize=full&apikey=${apikey}`;
     const fetchBtn = document.getElementById('fetchBtn');
 
     document.getElementById('loading').style.display = 'block';
@@ -108,10 +63,9 @@ function fetchData() {
         fetch(overviewUrl).then(res => res.json()),
         fetch(cashFlowUrl).then(res => res.json()),
         fetch(balanceSheetUrl).then(res => res.json()),
-        fetch(incomeStatementUrl).then(res => res.json()),
-        fetch(dailyUrl).then(res => res.json())
+        fetch(incomeStatementUrl).then(res => res.json())
     ])
-    .then(([overviewData, cashFlowData, balanceSheetData, incomeStatementData, dailyData]) => {
+    .then(([overviewData, cashFlowData, balanceSheetData, incomeStatementData]) => {
         // OVERVIEW Processing
         if (overviewData.Information || overviewData.Note) throw new Error('API rate limit exceeded');
         if (Object.keys(overviewData).length === 0) throw new Error('No data returned by OVERVIEW');
@@ -252,93 +206,4 @@ function fetchData() {
         metricDetails['net_margin'] = `Net Margin: ${netMargin}<br>Net Income (${incomeReports[0].fiscalDateEnding}): ${netIncome[0]}<br>Revenue (${incomeReports[0].fiscalDateEnding}): ${revenue[0]}`;
         metricDetails['net_margin_1yr_change'] = `Net Margin 1-Yr Change: ${netMargin1Yr}<br>Current (${incomeReports[0].fiscalDateEnding}): ${netMargins[0] ? netMargins[0].toFixed(2) : 0}%<br>Previous (${incomeReports[1].fiscalDateEnding}): ${netMargins[1] ? netMargins[1].toFixed(2) : 0}%`;
         metricDetails['net_margin_3yr_change'] = `Net Margin 3-Yr Change: ${netMargin3Yr}<br>Current (${incomeReports[0].fiscalDateEnding}): ${netMargins[0] ? netMargins[0].toFixed(2) : 0}%<br>3-Yr Ago (${incomeReports[2].fiscalDateEnding}): ${netMargins[2] ? netMargins[2].toFixed(2) : 0}%`;
-        metricDetails['net_margin_5yr_change'] = `Net Margin 5-Yr Change: ${netMargin5Yr}<br>Current (${incomeReports[0].fiscalDateEnding}): ${netMargins[0] ? netMargins[0].toFixed(2) : 0}%<br>5-Yr Ago (${incomeReports[4].fiscalDateEnding}): ${netMargins[4] ? netMargins[4].toFixed(2) : 0}%`;
-
-        document.getElementById('gross_margin').innerText = `Gross Margin: ${grossMargin}`;
-        document.getElementById('gross_margin_1yr_change').innerText = `Gross Margin 1-Yr Change: ${grossMargin1Yr.split(' ')[0]}`;
-        document.getElementById('gross_margin_3yr_change').innerText = `Gross Margin 3-Yr Change: ${grossMargin3Yr.split(' ')[0]}`;
-        document.getElementById('gross_margin_5yr_change').innerText = `Gross Margin 5-Yr Change: ${grossMargin5Yr.split(' ')[0]}`;
-        document.getElementById('operating_margin').innerText = `Operating Margin: ${operatingMargin}`;
-        document.getElementById('operating_margin_1yr_change').innerText = `Operating Margin 1-Yr Change: ${operatingMargin1Yr.split(' ')[0]}`;
-        document.getElementById('operating_margin_3yr_change').innerText = `Operating Margin 3-Yr Change: ${operatingMargin3Yr.split(' ')[0]}`;
-        document.getElementById('operating_margin_5yr_change').innerText = `Operating Margin 5-Yr Change: ${operatingMargin5Yr.split(' ')[0]}`;
-        document.getElementById('net_margin').innerText = `Net Margin: ${netMargin}`;
-        document.getElementById('net_margin_1yr_change').innerText = `Net Margin 1-Yr Change: ${netMargin1Yr.split(' ')[0]}`;
-        document.getElementById('net_margin_3yr_change').innerText = `Net Margin 3-Yr Change: ${netMargin3Yr.split(' ')[0]}`;
-        document.getElementById('net_margin_5yr_change').innerText = `Net Margin 5-Yr Change: ${netMargin5Yr.split(' ')[0]}`;
-
-        // Technical Metrics (TIME_SERIES_DAILY)
-        if (dailyData['Error Message']) throw new Error('Daily data error');
-        const timeSeries = dailyData['Time Series (Daily)'] || {};
-        const dates = Object.keys(timeSeries).sort().reverse();
-        const closes = dates.map(date => parseFloat(timeSeries[date]['4. close']) || 0);
-        const highs = dates.map(date => parseFloat(timeSeries[date]['2. high']) || 0);
-        const lows = dates.map(date => parseFloat(timeSeries[date]['3. low']) || 0);
-        const volumes = dates.map(date => parseFloat(timeSeries[date]['5. volume']) || 0);
-
-        const currentPrice = closes[0];
-        const rsi = calculateRSI(closes);
-        const mfi = calculateMFI(highs, lows, closes, volumes);
-        const yearHigh = Math.max(...closes.slice(0, 252)); // ~1 year of trading days
-        const yearLow = Math.min(...closes.slice(0, 252));
-        const priceVs52WkHigh = ((currentPrice / yearHigh) * 100 - 100).toFixed(2) + '%';
-        const priceVs52WkLow = ((currentPrice / yearLow) * 100 - 100).toFixed(2) + '%';
-        const bollinger20 = calculateBollingerPercent(closes, 20);
-        const bollinger50 = calculateBollingerPercent(closes, 50);
-        const sma50 = calculateSMA(closes, 50);
-        const sma200 = calculateSMA(closes, 200);
-        const priceVs50DayAvg = sma50 ? ((currentPrice / sma50) * 100 - 100).toFixed(2) + '%' : 'N/A';
-        const priceVs200DayAvg = sma200 ? ((currentPrice / sma200) * 100 - 100).toFixed(2) + '%' : 'N/A';
-
-        metricDetails['rsi'] = `RSI: ${rsi}<br>Based on 14-day closing prices: ${closes.slice(0, 14).join(', ')}`;
-        metricDetails['mfi'] = `MFI: ${mfi}<br>Based on 14-day H/L/C/Vol: Highs: ${highs.slice(0, 14).join(', ')}<br>Lows: ${lows.slice(0, 14).join(', ')}<br>Closes: ${closes.slice(0, 14).join(', ')}<br>Volumes: ${volumes.slice(0, 14).join(', ')}`;
-        metricDetails['price_vs_52wk_high'] = `Price vs 52-Wk High: ${priceVs52WkHigh}<br>Current Price: ${currentPrice}<br>52-Wk High: ${yearHigh}`;
-        metricDetails['price_vs_52wk_low'] = `Price vs 52-Wk Low: ${priceVs52WkLow}<br>Current Price: ${currentPrice}<br>52-Wk Low: ${yearLow}`;
-        metricDetails['bollinger_percent_20'] = `Bollinger Percent 20: ${bollinger20}<br>Based on 20-day prices: ${closes.slice(0, 20).join(', ')}`;
-        metricDetails['bollinger_percent_50'] = `Bollinger Percent 50: ${bollinger50}<br>Based on 50-day prices: ${closes.slice(0, 50).join(', ')}`;
-        metricDetails['price_vs_50day_avg'] = `Price vs 50-Day Avg: ${priceVs50DayAvg}<br>Current Price: ${currentPrice}<br>50-Day SMA: ${sma50.toFixed(2)}`;
-        metricDetails['price_vs_200day_avg'] = `Price vs 200-Day Avg: ${priceVs200DayAvg}<br>Current Price: ${currentPrice}<br>200-Day SMA: ${sma200.toFixed(2)}`;
-
-        document.getElementById('rsi').innerText = `RSI: ${rsi}`;
-        document.getElementById('mfi').innerText = `MFI: ${mfi}`;
-        document.getElementById('price_vs_52wk_high').innerText = `Price vs 52-Wk High: ${priceVs52WkHigh}`;
-        document.getElementById('price_vs_52wk_low').innerText = `Price vs 52-Wk Low: ${priceVs52WkLow}`;
-        document.getElementById('bollinger_percent_20').innerText = `Bollinger Percent 20: ${bollinger20}`;
-        document.getElementById('bollinger_percent_50').innerText = `Bollinger Percent 50: ${bollinger50}`;
-        document.getElementById('price_vs_50day_avg').innerText = `Price vs 50-Day Avg: ${priceVs50DayAvg}`;
-        document.getElementById('price_vs_200day_avg').innerText = `Price vs 200-Day Avg: ${priceVs200DayAvg}`;
-    })
-    .catch(error => {
-        console.error('Error Details:', error.message);
-        if (error.message.includes('rate limit')) {
-            alert('API rate limit exceeded (25 requests/day). Wait until tomorrow or upgrade at alphavantage.co/premium.');
-        } else if (error.message.includes('No data')) {
-            alert('API returned no usable data for this symbol.');
-        } else {
-            alert(`Error: ${error.message}. Check console for details.`);
-        }
-    })
-    .finally(() => {
-        document.getElementById('loading').style.display = 'none';
-        fetchBtn.disabled = false;
-        setTimeout(() => { isFetching = false; }, 15000);
-    });
-}
-
-function clearResults() {
-    const resultElements = [
-        'pe_ttm', 'pe_forward', 'price_to_sales', 'price_to_book', 'ev_ebitda', 'price_to_fcf', 'ev_fcf',
-        'sales_growth_1yr', 'sales_growth_3yr', 'sales_growth_5yr',
-        'eps_growth_1yr', 'eps_growth_3yr', 'eps_growth_5yr',
-        'ebitda_growth_1yr', 'ebitda_growth_3yr', 'ebitda_growth_5yr',
-        'gross_margin', 'gross_margin_1yr_change', 'gross_margin_3yr_change', 'gross_margin_5yr_change',
-        'operating_margin', 'operating_margin_1yr_change', 'operating_margin_3yr_change', 'operating_margin_5yr_change',
-        'net_margin', 'net_margin_1yr_change', 'net_margin_3yr_change', 'net_margin_5yr_change',
-        'rsi', 'mfi', 'price_vs_52wk_high', 'price_vs_52wk_low',
-        'bollinger_percent_20', 'bollinger_percent_50', 'price_vs_50day_avg', 'price_vs_200day_avg'
-    ];
-    resultElements.forEach(id => {
-        document.getElementById(id).innerText = '';
-    });
-    metricDetails = {};
-}
+        metricDetails['net_margin_5yr_change'] = `Net Margin 5-Y
