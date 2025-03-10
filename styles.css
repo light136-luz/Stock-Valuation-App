@@ -1,0 +1,19 @@
+.metric-card { 
+    background-color: #f8f9fa; 
+    padding: 15px; 
+    border-radius: 8px; 
+    margin-bottom: 10px; 
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
+    cursor: pointer; 
+}
+.loading { 
+    display: none; 
+    text-align: center; 
+    margin-top: 20px; 
+}
+.btn:disabled { 
+    opacity: 0.6; 
+}
+.section-title { 
+    margin-top: 20px; 
+}
