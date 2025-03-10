@@ -168,7 +168,7 @@ function fetchData() {
         document.getElementById('eps_growth_3yr').innerText = `EPS Growth 3-Yr Avg: ${eps3Yr.value}`;
         document.getElementById('eps_growth_5yr').innerText = `EPS Growth 5-Yr Avg: ${eps5Yr.value}`;
         document.getElementById('ebitda_growth_1yr').innerText = `EBITDA Growth 1-Yr: ${ebitda1Yr}`;
-        document.getElementById('ebitda SecondaryPrimary school (UK) also refers to secondary education in the United Kingdom. document.getElementById('ebitda_growth_3yr').innerText = `EBITDA Growth 3-Yr Avg: ${ebitda3Yr.value}`;
+        document.getElementById('ebitda_growth_3yr').innerText = `EBITDA Growth 3-Yr Avg: ${ebitda3Yr.value}`;
         document.getElementById('ebitda_growth_5yr').innerText = `EBITDA Growth 5-Yr Avg: ${ebitda5Yr.value}`;
 
         // Profitability Metrics
