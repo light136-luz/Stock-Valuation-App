@@ -268,21 +268,23 @@ function fetchData() {
         document.getElementById('net_margin_5yr_change').innerText = `Net Margin 5-Yr Change: ${netMargin5Yr.split(' ')[0]}`;
 
         // Technical Metrics
+        console.log('Daily Data:', dailyData); // Debug log
         if (dailyData['Error Message']) throw new Error('Daily data error');
         const timeSeries = dailyData['Time Series (Daily)'] || {};
+        if (Object.keys(timeSeries).length === 0) console.log('No time series data available');
         const dates = Object.keys(timeSeries).sort().reverse();
         const closes = dates.map(date => parseFloat(timeSeries[date]['4. close']) || 0);
         const highs = dates.map(date => parseFloat(timeSeries[date]['2. high']) || 0);
         const lows = dates.map(date => parseFloat(timeSeries[date]['3. low']) || 0);
         const volumes = dates.map(date => parseFloat(timeSeries[date]['5. volume']) || 0);
 
-        const currentPrice = closes[0];
+        const currentPrice = closes[0] || 0;
         const rsi = calculateRSI(closes);
         const mfi = calculateMFI(highs, lows, closes, volumes);
-        const yearHigh = Math.max(...closes.slice(0, 252)); // ~1 year of trading days
-        const yearLow = Math.min(...closes.slice(0, 252));
-        const priceVs52WkHigh = ((currentPrice / yearHigh) * 100 - 100).toFixed(2) + '%';
-        const priceVs52WkLow = ((currentPrice / yearLow) * 100 - 100).toFixed(2) + '%';
+        const yearHigh = closes.length > 252 ? Math.max(...closes.slice(0, 252)) : 0;
+        const yearLow = closes.length > 252 ? Math.min(...closes.slice(0, 252)) : 0;
+        const priceVs52WkHigh = yearHigh ? ((currentPrice / yearHigh) * 100 - 100).toFixed(2) + '%' : 'N/A';
+        const priceVs52WkLow = yearLow ? ((currentPrice / yearLow) * 100 - 100).toFixed(2) + '%' : 'N/A';
         const bollinger20 = calculateBollingerPercent(closes, 20);
         const bollinger50 = calculateBollingerPercent(closes, 50);
         const sma50 = calculateSMA(closes, 50);
