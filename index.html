@@ -1,100 +1,63 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Stock Valuation App</title>
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
-    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        #loading { display: none; text-align: center; margin: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .metric-label { font-weight: bold; }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <h1 class="mt-4 text-center">Stock Valuation Metrics</h1>
-        <div class="row mt-4 justify-content-center">
-            <div class="col-md-4">
-                <label for="symbol">Enter Stock Symbol:</label>
-                <input type="text" id="symbol" class="form-control" placeholder="e.g., AMD">
+    <div class="container mt-5">
+        <h1 class="text-center">Stock Valuation App</h1>
+        <div class="row mb-3">
+            <div class="col">
+                <input type="text" id="symbol1" class="form-control" placeholder="Ticker 1 (e.g., AMD)">
             </div>
-            <div class="col-md-2">
-                <button id="fetchBtn" onclick="fetchData()" class="btn btn-primary mt-4">Fetch Data</button>
+            <div class="col">
+                <input type="text" id="symbol2" class="form-control" placeholder="Ticker 2 (e.g., NVDA)">
             </div>
-        </div>
-        <div class="row mt-4">
-            <div class="col-md-6 mx-auto">
-                <div id="loading" class="loading">
-                    <div class="spinner-border text-primary" role="status"></div>
-                    <p>Loading...</p>
-                </div>
-                <h3>Valuation Metrics</h3>
-                <div id="valuation-results">
-                    <div id="pe_ttm" class="metric-card" onclick="showDetails('pe_ttm')"></div>
-                    <div id="pe_forward" class="metric-card" onclick="showDetails('pe_forward')"></div>
-                    <div id="price_to_sales" class="metric-card" onclick="showDetails('price_to_sales')"></div>
-                    <div id="price_to_book" class="metric-card" onclick="showDetails('price_to_book')"></div>
-                    <div id="ev_ebitda" class="metric-card" onclick="showDetails('ev_ebitda')"></div>
-                    <div id="price_to_fcf" class="metric-card" onclick="showDetails('price_to_fcf')"></div>
-                    <div id="ev_fcf" class="metric-card" onclick="showDetails('ev_fcf')"></div>
-                </div>
-                <h3 class="section-title">Growth Metrics</h3>
-                <div id="growth-results">
-                    <div id="sales_growth_1yr" class="metric-card" onclick="showDetails('sales_growth_1yr')"></div>
-                    <div id="sales_growth_3yr" class="metric-card" onclick="showDetails('sales_growth_3yr')"></div>
-                    <div id="sales_growth_5yr" class="metric-card" onclick="showDetails('sales_growth_5yr')"></div>
-                    <div id="eps_growth_1yr" class="metric-card" onclick="showDetails('eps_growth_1yr')"></div>
-                    <div id="eps_growth_3yr" class="metric-card" onclick="showDetails('eps_growth_3yr')"></div>
-                    <div id="eps_growth_5yr" class="metric-card" onclick="showDetails('eps_growth_5yr')"></div>
-                    <div id="ebitda_growth_1yr" class="metric-card" onclick="showDetails('ebitda_growth_1yr')"></div>
-                    <div id="ebitda_growth_3yr" class="metric-card" onclick="showDetails('ebitda_growth_3yr')"></div>
-                    <div id="ebitda_growth_5yr" class="metric-card" onclick="showDetails('ebitda_growth_5yr')"></div>
-                </div>
-                <h3 class="section-title">Profitability Metrics</h3>
-                <div id="profitability-results">
-                    <div id="gross_margin" class="metric-card" onclick="showDetails('gross_margin')"></div>
-                    <div id="gross_margin_1yr_change" class="metric-card" onclick="showDetails('gross_margin_1yr_change')"></div>
-                    <div id="gross_margin_3yr_change" class="metric-card" onclick="showDetails('gross_margin_3yr_change')"></div>
-                    <div id="gross_margin_5yr_change" class="metric-card" onclick="showDetails('gross_margin_5yr_change')"></div>
-                    <div id="operating_margin" class="metric-card" onclick="showDetails('operating_margin')"></div>
-                    <div id="operating_margin_1yr_change" class="metric-card" onclick="showDetails('operating_margin_1yr_change')"></div>
-                    <div id="operating_margin_3yr_change" class="metric-card" onclick="showDetails('operating_margin_3yr_change')"></div>
-                    <div id="operating_margin_5yr_change" class="metric-card" onclick="showDetails('operating_margin_5yr_change')"></div>
-                    <div id="net_margin" class="metric-card" onclick="showDetails('net_margin')"></div>
-                    <div id="net_margin_1yr_change" class="metric-card" onclick="showDetails('net_margin_1yr_change')"></div>
-                    <div id="net_margin_3yr_change" class="metric-card" onclick="showDetails('net_margin_3yr_change')"></div>
-                    <div id="net_margin_5yr_change" class="metric-card" onclick="showDetails('net_margin_5yr_change')"></div>
-                </div>
-                <h3 class="section-title">Technical Metrics</h3>
-                <div id="technical-results">
-                    <div id="rsi" class="metric-card" onclick="showDetails('rsi')"></div>
-                    <div id="mfi" class="metric-card" onclick="showDetails('mfi')"></div>
-                    <div id="price_vs_52wk_high" class="metric-card" onclick="showDetails('price_vs_52wk_high')"></div>
-                    <div id="price_vs_52wk_low" class="metric-card" onclick="showDetails('price_vs_52wk_low')"></div>
-                    <div id="bollinger_percent_20" class="metric-card" onclick="showDetails('bollinger_percent_20')"></div>
-                    <div id="bollinger_percent_50" class="metric-card" onclick="showDetails('bollinger_percent_50')"></div>
-                    <div id="price_vs_50day_avg" class="metric-card" onclick="showDetails('price_vs_50day_avg')"></div>
-                    <div id="price_vs_200day_avg" class="metric-card" onclick="showDetails('price_vs_200day_avg')"></div>
-                </div>
+            <div class="col">
+                <input type="text" id="symbol3" class="form-control" placeholder="Ticker 3 (e.g., TSLA)">
+            </div>
+            <div class="col">
+                <input type="text" id="symbol4" class="form-control" placeholder="Ticker 4 (e.g., AAPL)">
+            </div>
+            <div class="col">
+                <input type="text" id="symbol5" class="form-control" placeholder="Ticker 5 (e.g., MSFT)">
             </div>
         </div>
+        <div class="text-center">
+            <button id="fetchBtn" class="btn btn-primary" onclick="fetchData()">Fetch Data</button>
+        </div>
+        <div id="loading">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+        <table id="resultsTable">
+            <thead>
+                <tr>
+                    <th>Metric</th>
+                    <th id="ticker1">Ticker 1</th>
+                    <th id="ticker2">Ticker 2</th>
+                    <th id="ticker3">Ticker 3</th>
+                    <th id="ticker4">Ticker 4</th>
+                    <th id="ticker5">Ticker 5</th>
+                </tr>
+            </thead>
+            <tbody id="resultsBody"></tbody>
+        </table>
     </div>
 
-    <div class="modal fade" id="metricModal" tabindex="-1" role="dialog" aria-labelledby="metricModalLabel" aria-hidden="true">
-        <div class="modal-dialog" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="metricModalLabel">Metric Details</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">×</span>
-                    </button>
-                </div>
-                <div class="modal-body" id="metricDetails"></div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
-    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
-    <script src="scripts.js" defer></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="scripts.js"></script>
 </body>
 </html>
