@@ -299,7 +299,7 @@ function fetchData() {
         metricDetails['bollinger_percent_20'] = `Bollinger Percent 20: ${bollinger20}<br>Based on 20-day prices: ${closes.slice(0, 20).join(', ')}`;
         metricDetails['bollinger_percent_50'] = `Bollinger Percent 50: ${bollinger50}<br>Based on 50-day prices: ${closes.slice(0, 50).join(', ')}`;
         metricDetails['price_vs_50day_avg'] = `Price vs 50-Day Avg: ${priceVs50DayAvg}<br>Current Price: ${currentPrice}<br>50-Day SMA: ${sma50.toFixed(2)}`;
-        metricDetails['price_vs_200day_avg'] = `Price vs 200-Day Avg: ${priceVs200dayAvg}<br>Current Price: ${currentPrice}<br>200-Day SMA: ${sma200.toFixed(2)}`;
+        metricDetails['price_vs_200day_avg'] = `Price vs 200-Day Avg: ${priceVs200DayAvg}<br>Current Price: ${currentPrice}<br>200-Day SMA: ${sma200.toFixed(2)}`;
 
         document.getElementById('rsi').innerText = `RSI: ${rsi}`;
         document.getElementById('mfi').innerText = `MFI: ${mfi}`;
@@ -308,7 +308,7 @@ function fetchData() {
         document.getElementById('bollinger_percent_20').innerText = `Bollinger Percent 20: ${bollinger20}`;
         document.getElementById('bollinger_percent_50').innerText = `Bollinger Percent 50: ${bollinger50}`;
         document.getElementById('price_vs_50day_avg').innerText = `Price vs 50-Day Avg: ${priceVs50DayAvg}`;
-        document.getElementById('price_vs_200day_avg').innerText = `Price vs 200-Day Avg: ${priceVs200dayAvg}`;
+        document.getElementById('price_vs_200day_avg').innerText = `Price vs 200-Day Avg: ${priceVs200DayAvg}`; // Fixed typo here
     })
     .catch(error => {
         console.error('Error Details:', error.message);
