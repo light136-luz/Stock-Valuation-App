@@ -308,7 +308,7 @@ function fetchData() {
         document.getElementById('bollinger_percent_20').innerText = `Bollinger Percent 20: ${bollinger20}`;
         document.getElementById('bollinger_percent_50').innerText = `Bollinger Percent 50: ${bollinger50}`;
         document.getElementById('price_vs_50day_avg').innerText = `Price vs 50-Day Avg: ${priceVs50DayAvg}`;
-        document.getElementById('price_vs_200day_avg').innerText = `Price vs 200-Day Avg: ${priceVs200DayAvg}`; // Fixed typo here
+        document.getElementById('price_vs_200day_avg').innerText = `Price vs 200-Day Avg: ${priceVs200DayAvg}`;
     })
     .catch(error => {
         console.error('Error Details:', error.message);
