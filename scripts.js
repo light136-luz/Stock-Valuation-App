@@ -1,5 +1,6 @@
 let isFetching = false;
 let metricDetails = {};
+let historicalData = {};
 
 function calculateGrowthRate(current, previous) {
     if (!current || !previous || previous === 0) return 'N/A';
@@ -79,6 +80,231 @@ function showDetails(symbol, metricId) {
     $('#metricModal').modal('show');
 }
 
+function openChartWindow(symbol, metricId) {
+    const metricName = document.getElementById(`${symbol}_${metricId}`).innerText.split(':')[0];
+    const chartWindow = window.open('', '_blank', 'width=800,height=600');
+    chartWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>${symbol} - ${metricName} Chart</title>
+            <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+            <style>
+                body { font-family: Arial, sans-serif; background-color: #1a1a1a; color: #fff; padding: 20px; }
+                .chart-container { background: rgba(0, 0, 0, 0.7); padding: 20px; border-radius: 10px; }
+                select { margin-bottom: 20px; padding: 5px; }
+            </style>
+        </head>
+        <body>
+            <h2>${symbol} - ${metricName} Chart</h2>
+            <select id="chartType" onchange="updateChart('${symbol}', '${metricId}', this.value)">
+                <option value="yearly">Yearly (Last 5 Years)</option>
+                <option value="quarterly">Quarterly (Last 5 Years)</option>
+            </select>
+            <div class="chart-container">
+                <canvas id="metricChart"></canvas>
+            </div>
+            <script>
+                let chart;
+                function updateChart(symbol, metricId, type) {
+                    const data = window.opener.getChartData(symbol, metricId, type);
+                    const ctx = document.getElementById('metricChart').getContext('2d');
+                    if (chart) chart.destroy();
+                    chart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: data.labels,
+                            datasets: [{
+                                label: metricName,
+                                data: data.values,
+                                borderColor: '#ff8c00',
+                                fill: false
+                            }]
+                        },
+                        options: {
+                            scales: {
+                                x: { title: { display: true, text: 'Date', color: '#fff' }, ticks: { color: '#fff' } },
+                                y: { title: { display: true, text: metricName, color: '#fff' }, ticks: { color: '#fff' } }
+                            },
+                            plugins: {
+                                legend: { labels: { color: '#fff' } }
+                            }
+                        }
+                    });
+                }
+                updateChart('${symbol}', '${metricId}', 'yearly');
+            </script>
+        </body>
+        </html>
+    `);
+}
+
+function getChartData(symbol, metricId, type) {
+    const data = historicalData[symbol] || {};
+    let labels = [];
+    let values = [];
+
+    if (['current_price', 'rsi', 'mfi', 'price_vs_52wk_high', 'price_vs_52wk_low', 'bollinger_percent_20', 'bollinger_percent_50', 'price_vs_50day_avg', 'price_vs_200day_avg'].includes(metricId)) {
+        const dailyData = data.daily || {};
+        const dates = Object.keys(dailyData).sort().reverse().slice(0, 1260); // Approx 5 years of trading days
+        const closes = dates.map(date => parseFloat(dailyData[date]['4. close']) || 0);
+        const highs = dates.map(date => parseFloat(dailyData[date]['2. high']) || 0);
+        const lows = dates.map(date => parseFloat(dailyData[date]['3. low']) || 0);
+        const volumes = dates.map(date => parseFloat(dailyData[date]['5. volume']) || 0);
+
+        if (metricId === 'current_price') {
+            values = closes;
+            labels = dates;
+        } else if (metricId === 'rsi') {
+            for (let i = 0; i < closes.length - 14; i++) {
+                values.push(calculateRSI(closes.slice(i, i + 15)));
+                labels.push(dates[i]);
+            }
+        } else if (metricId === 'mfi') {
+            for (let i = 0; i < closes.length - 14; i++) {
+                values.push(calculateMFI(highs.slice(i, i + 15), lows.slice(i, i + 15), closes.slice(i, i + 15), volumes.slice(i, i + 15)));
+                labels.push(dates[i]);
+            }
+        } else if (metricId === 'price_vs_52wk_high') {
+            for (let i = 0; i < closes.length - 252; i++) {
+                const yearHigh = Math.max(...closes.slice(i, i + 252));
+                values.push(((closes[i] / yearHigh) * 100 - 100).toFixed(2));
+                labels.push(dates[i]);
+            }
+        } else if (metricId === 'price_vs_52wk_low') {
+            for (let i = 0; i < closes.length - 252; i++) {
+                const yearLow = Math.min(...closes.slice(i, i + 252));
+                values.push(((closes[i] / yearLow) * 100 - 100).toFixed(2));
+                labels.push(dates[i]);
+            }
+        } else if (metricId === 'bollinger_percent_20') {
+            for (let i = 0; i < closes.length - 20; i++) {
+                values.push(calculateBollingerPercent(closes.slice(i, i + 20), 20).replace('%', ''));
+                labels.push(dates[i]);
+            }
+        } else if (metricId === 'bollinger_percent_50') {
+            for (let i = 0; i < closes.length - 50; i++) {
+                values.push(calculateBollingerPercent(closes.slice(i, i + 50), 50).replace('%', ''));
+                labels.push(dates[i]);
+            }
+        } else if (metricId === 'price_vs_50day_avg') {
+            for (let i = 0; i < closes.length - 50; i++) {
+                const sma50 = calculateSMA(closes.slice(i, i + 50), 50);
+                values.push(((closes[i] / sma50) * 100 - 100).toFixed(2));
+                labels.push(dates[i]);
+            }
+        } else if (metricId === 'price_vs_200day_avg') {
+            for (let i = 0; i < closes.length - 200; i++) {
+                const sma200 = calculateSMA(closes.slice(i, i + 200), 200);
+                values.push(((closes[i] / sma200) * 100 - 100).toFixed(2));
+                labels.push(dates[i]);
+            }
+        }
+    } else {
+        const incomeReports = data.income || [];
+        const balanceReports = data.balance || [];
+        const overview = data.overview || {};
+        const marketCap = parseFloat(overview.MarketCapitalization) || 0;
+
+        const epsData = incomeReports.map((income, i) => {
+            const matchingBalance = balanceReports.find(b => b.fiscalDateEnding === income.fiscalDateEnding) || {};
+            const netIncome = parseFloat(income.netIncome) || 0;
+            const shares = parseFloat(matchingBalance.commonStockSharesOutstanding) || parseFloat(overview.SharesOutstanding) || 0;
+            return shares ? { eps: netIncome / shares, fiscalDateEnding: income.fiscalDateEnding } : { eps: 0, fiscalDateEnding: income.fiscalDateEnding };
+        });
+
+        const sales = incomeReports.map(r => parseFloat(r.totalRevenue) || 0);
+        const ebitda = incomeReports.map(r => parseFloat(r.ebitda) || (parseFloat(r.operatingIncome) + parseFloat(r.depreciationAndAmortization)) || 0);
+        const grossProfit = incomeReports.map(r => parseFloat(r.grossProfit) || 0);
+        const operatingIncome = incomeReports.map(r => parseFloat(r.operatingIncome) || 0);
+        const netIncome = incomeReports.map(r => parseFloat(r.netIncome) || 0);
+        const revenue = incomeReports.map(r => parseFloat(r.totalRevenue) || 0);
+        const grossMargins = revenue.map((rev, i) => rev ? (grossProfit[i] / rev * 100) : 0);
+        const operatingMargins = revenue.map((rev, i) => rev ? (operatingIncome[i] / rev * 100) : 0);
+        const netMargins = revenue.map((rev, i) => rev ? (netIncome[i] / rev * 100) : 0);
+
+        const reports = type === 'yearly' ? incomeReports.slice(0, 5) : data.incomeQuarterly.slice(0, 20);
+        labels = reports.map(r => r.fiscalDateEnding);
+        if (metricId === 'market_cap') {
+            values = reports.map(() => (marketCap / 1e9).toFixed(2));
+        } else if (metricId === 'pe_ttm') {
+            values = reports.map(r => overview.TrailingPE || 'N/A');
+        } else if (metricId === 'pe_forward') {
+            values = reports.map(r => overview.ForwardPE || 'N/A');
+        } else if (metricId === 'price_to_sales') {
+            values = reports.map(r => overview.PriceToSalesRatioTTM || 'N/A');
+        } else if (metricId === 'price_to_book') {
+            values = reports.map(r => overview.PriceToBookRatio || 'N/A');
+        } else if (metricId === 'ev_ebitda') {
+            values = reports.map(r => overview.EVToEBITDA || 'N/A');
+        } else if (metricId === 'price_to_fcf') {
+            const fcf = parseFloat(data.cashFlow?.[0]?.operatingCashflow) || 0;
+            values = reports.map(() => fcf ? (marketCap / fcf).toFixed(2) : 'N/A');
+        } else if (metricId === 'ev_fcf') {
+            const fcf = parseFloat(data.cashFlow?.[0]?.operatingCashflow) || 0;
+            const latestBalance = balanceReports[0] || {};
+            const longTermDebt = parseFloat(latestBalance.longTermDebt) || 0;
+            const shortTermDebt = parseFloat(latestBalance.shortLongTermDebtTotal) || 0;
+            const cash = parseFloat(latestBalance.cashAndCashEquivalentsAtCarryingValue) || 0;
+            const totalDebt = longTermDebt + shortTermDebt;
+            const ev = marketCap + totalDebt - cash;
+            values = reports.map(() => fcf ? (ev / fcf).toFixed(2) : 'N/A');
+        } else if (metricId === 'sales_growth_1yr' || metricId === 'sales_growth_3yr' || metricId === 'sales_growth_5yr') {
+            for (let i = 0; i < reports.length - 1; i++) {
+                const current = parseFloat(reports[i].totalRevenue) || 0;
+                const previous = parseFloat(reports[i + 1].totalRevenue) || 0;
+                values.push(calculateGrowthRate(current, previous).replace('%', ''));
+            }
+            labels = labels.slice(0, -1);
+        } else if (metricId === 'eps_growth_1yr' || metricId === 'eps_growth_3yr' || metricId === 'eps_growth_5yr') {
+            const epsReports = type === 'yearly' ? epsData.slice(0, 5) : data.incomeQuarterly.map((income, i) => {
+                const matchingBalance = balanceReports.find(b => b.fiscalDateEnding === income.fiscalDateEnding) || {};
+                const netIncome = parseFloat(income.netIncome) || 0;
+                const shares = parseFloat(matchingBalance.commonStockSharesOutstanding) || parseFloat(overview.SharesOutstanding) || 0;
+                return shares ? { eps: netIncome / shares, fiscalDateEnding: income.fiscalDateEnding } : { eps: 0, fiscalDateEnding: income.fiscalDateEnding };
+            }).slice(0, 20);
+            for (let i = 0; i < epsReports.length - 1; i++) {
+                values.push(calculateGrowthRate(epsReports[i].eps, epsReports[i + 1].eps).replace('%', ''));
+            }
+            labels = labels.slice(0, -1);
+        } else if (metricId === 'ebitda_growth_1yr' || metricId === 'ebitda_growth_3yr' || metricId === 'ebitda_growth_5yr') {
+            const ebitdaReports = reports.map(r => parseFloat(r.ebitda) || (parseFloat(r.operatingIncome) + parseFloat(r.depreciationAndAmortization)) || 0);
+            for (let i = 0; i < ebitdaReports.length - 1; i++) {
+                values.push(calculateGrowthRate(ebitdaReports[i], ebitdaReports[i + 1]).replace('%', ''));
+            }
+            labels = labels.slice(0, -1);
+        } else if (metricId === 'gross_margin' || metricId.includes('gross_margin_')) {
+            values = reports.map((r, i) => {
+                const rev = parseFloat(r.totalRevenue) || 0;
+                const gp = parseFloat(r.grossProfit) || 0;
+                return rev ? (gp / rev * 100).toFixed(2) : '0';
+            });
+        } else if (metricId === 'operating_margin' || metricId.includes('operating_margin_')) {
+            values = reports.map((r, i) => {
+                const rev = parseFloat(r.totalRevenue) || 0;
+                const oi = parseFloat(r.operatingIncome) || 0;
+                return rev ? (oi / rev * 100).toFixed(2) : '0';
+            });
+        } else if (metricId === 'net_margin' || metricId.includes('net_margin_')) {
+            values = reports.map((r, i) => {
+                const rev = parseFloat(r.totalRevenue) || 0;
+                const ni = parseFloat(r.netIncome) || 0;
+                return rev ? (ni / rev * 100).toFixed(2) : '0';
+            });
+        }
+    }
+
+    if (type === 'yearly' && !['current_price', 'rsi', 'mfi', 'price_vs_52wk_high', 'price_vs_52wk_low', 'bollinger_percent_20', 'bollinger_percent_50', 'price_vs_50day_avg', 'price_vs_200day_avg'].includes(metricId)) {
+        labels = labels.slice(0, 5);
+        values = values.slice(0, 5);
+    } else if (type === 'quarterly' && !['current_price', 'rsi', 'mfi', 'price_vs_52wk_high', 'price_vs_52wk_low', 'bollinger_percent_20', 'bollinger_percent_50', 'price_vs_50day_avg', 'price_vs_200day_avg'].includes(metricId)) {
+        labels = labels.slice(0, 20);
+        values = values.slice(0, 20);
+    }
+
+    return { labels: labels.reverse(), values: values.reverse() };
+}
+
 function fetchData() {
     if (isFetching) {
         alert('Please wait a moment before fetching again.');
@@ -103,15 +329,26 @@ function fetchData() {
     const balanceSheetUrl = `https://www.alphavantage.co/query?function=BALANCE_SHEET&symbol=${symbol}&apikey=${apikey}`;
     const incomeStatementUrl = `https://www.alphavantage.co/query?function=INCOME_STATEMENT&symbol=${symbol}&apikey=${apikey}`;
     const dailyUrl = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&outputsize=full&apikey=${apikey}`;
+    const incomeStatementQuarterlyUrl = `https://www.alphavantage.co/query?function=INCOME_STATEMENT&symbol=${symbol}&apikey=${apikey}`;
 
     Promise.all([
         fetch(overviewUrl).then(res => res.json()),
         fetch(cashFlowUrl).then(res => res.json()),
         fetch(balanceSheetUrl).then(res => res.json()),
         fetch(incomeStatementUrl).then(res => res.json()),
-        fetch(dailyUrl).then(res => res.json())
+        fetch(dailyUrl).then(res => res.json()),
+        fetch(incomeStatementQuarterlyUrl).then(res => res.json())
     ])
-    .then(([overviewData, cashFlowData, balanceSheetData, incomeStatementData, dailyData]) => {
+    .then(([overviewData, cashFlowData, balanceSheetData, incomeStatementData, dailyData, incomeStatementQuarterlyData]) => {
+        historicalData[symbol] = {
+            overview: overviewData,
+            cashFlow: cashFlowData.annualReports,
+            balance: balanceSheetData.annualReports,
+            income: incomeStatementData.annualReports,
+            daily: dailyData['Time Series (Daily)'],
+            incomeQuarterly: incomeStatementQuarterlyData.quarterlyReports || []
+        };
+
         metricDetails[symbol] = {};
 
         // OVERVIEW
@@ -251,42 +488,44 @@ function fetchData() {
                 <div class="prominent-metric">
                     Stock Price: $${currentPriceFinal.toFixed(2)} | Market Cap: $${(marketCap / 1e9).toFixed(2)}B
                 </div>
-                <div class="metric-box"><span class="metric" id="${symbol}_pe_ttm" onclick="showDetails('${symbol}', 'pe_ttm')">TTM PE</span><span class="value">${peTTM}</span><span class="comparison">Many Stocks Trade At 20-28</span></div>
-                <div class="metric-box"><span class="metric" id="${symbol}_pe_forward" onclick="showDetails('${symbol}', 'pe_forward')">Forward PE</span><span class="value">${peForward}</span><span class="comparison">Many Stocks Trade At 18-26</span></div>
-                <div class="metric-box"><span class="metric" id="${symbol}_price_to_sales" onclick="showDetails('${symbol}', 'price_to_sales')">TTM P/S Ratio</span><span class="value">${priceToSales}</span><span class="comparison">Many Stocks Trade At 1.8-2.6</span></div>
-                <div class="metric-box"><span class="metric" id="${symbol}_price_to_book" onclick="showDetails('${symbol}', 'price_to_book')">Price to Book</span><span class="value">${priceToBook}</span><span class="comparison">Many Stocks Trade At 1.5-2.5</span></div>
-                <div class="metric-box"><span class="metric" id="${symbol}_ev_ebitda" onclick="showDetails('${symbol}', 'ev_ebitda')">EV / EBITDA</span><span class="value">${evEbitda}</span><span class="comparison">Many Stocks Trade At 10-15</span></div>
-                <div class="metric-box"><span class="metric" id="${symbol}_price_to_fcf" onclick="showDetails('${symbol}', 'price_to_fcf')">Price to FCF</span><span class="value">${priceToFCF}</span><span class="comparison">Many Stocks Trade At 20-30</span></div>
-                <div class="metric-box"><span class="metric" id="${symbol}_ev_fcf" onclick="showDetails('${symbol}', 'ev_fcf')">EV / FCF</span><span class="value">${evFCF}</span><span class="comparison">Many Stocks Trade At 15-25</span></div>
-                <div class="metric-box"><span class="metric" id="${symbol}_sales_growth_1yr" onclick="showDetails('${symbol}', 'sales_growth_1yr')">TTM Rev Growth</span><span class="value">${sales1Yr}</span><span class="comparison">Many Stocks Trade At 4.5-5.5%</span></div>
-                <div class="metric-box"><span class="metric" id="${symbol}_sales_growth_3yr" onclick="showDetails('${symbol}', 'sales_growth_3yr')">3-Yr Rev Growth</span><span class="value">${sales3Yr.value}</span><span class="comparison">Many Stocks Trade At 5-7%</span></div>
-                <div class="metric-box"><span class="metric" id="${symbol}_sales_growth_5yr" onclick="showDetails('${symbol}', 'sales_growth_5yr')">5-Yr Rev Growth</span><span class="value">${sales5Yr.value}</span><span class="comparison">Many Stocks Trade At 5-8%</span></div>
-                <div class="metric-box"><span class="metric" id="${symbol}_eps_growth_1yr" onclick="showDetails('${symbol}', 'eps_growth_1yr')">Current Yr Exp EPS Growth</span><span class="value">${eps1Yr}</span><span class="comparison">Many Stocks Trade At 8-12%</span></div>
-                <div class="metric-box"><span class="metric" id="${symbol}_eps_growth_3yr" onclick="showDetails('${symbol}', 'eps_growth_3yr')">3-Yr EPS Growth</span><span class="value">${eps3Yr.value}</span><span class="comparison">Many Stocks Trade At 8-15%</span></div>
-                <div class="metric-box"><span class="metric" id="${symbol}_eps_growth_5yr" onclick="showDetails('${symbol}', 'eps_growth_5yr')">5-Yr EPS Growth</span><span class="value">${eps5Yr.value}</span><span class="comparison">Many Stocks Trade At 8-15%</span></div>
-                <div class="metric-box"><span class="metric" id="${symbol}_ebitda_growth_1yr" onclick="showDetails('${symbol}', 'ebitda_growth_1yr')">Next Yr Exp Rev Growth</span><span class="value">${ebitda1Yr}</span><span class="comparison">Many Stocks Trade At 4-6%</span></div>
-                <div class="metric-box"><span class="metric" id="${symbol}_ebitda_growth_3yr" onclick="showDetails('${symbol}', 'ebitda_growth_3yr')">3-Yr EBITDA Growth</span><span class="value">${ebitda3Yr.value}</span><span class="comparison">Many Stocks Trade At 5-10%</span></div>
-                <div class="metric-box"><span class="metric" id="${symbol}_ebitda_growth_5yr" onclick="showDetails('${symbol}', 'ebitda_growth_5yr')">5-Yr EBITDA Growth</span><span class="value">${ebitda5Yr.value}</span><span class="comparison">Many Stocks Trade At 5-10%</span></div>
-                <div class="metric-box"><span class="metric" id="${symbol}_gross_margin" onclick="showDetails('${symbol}', 'gross_margin')">Gross Margin</span><span class="value">${grossMargin}</span><span class="comparison">Many Stocks Trade At 40-48%</span></div>
-                <div class="metric-box"><span class="metric" id="${symbol}_gross_margin_1yr_change" onclick="showDetails('${symbol}', 'gross_margin_1yr_change')">Gross Margin 1-Yr Change</span><span class="value">${grossMargin1Yr.split(' ')[0]}</span><span class="comparison">Many Stocks Trade At -2-2%</span></div>
-                <div class="metric-box"><span class="metric" id="${symbol}_gross_margin_3yr_change" onclick="showDetails('${symbol}', 'gross_margin_3yr_change')">Gross Margin 3-Yr Change</span><span class="value">${grossMargin3Yr.split(' ')[0]}</span><span class="comparison">Many Stocks Trade At -5-5%</span></div>
-                <div class="metric-box"><span class="metric" id="${symbol}_gross_margin_5yr_change" onclick="showDetails('${symbol}', 'gross_margin_5yr_change')">Gross Margin 5-Yr Change</span><span class="value">${grossMargin5Yr.split(' ')[0]}</span><span class="comparison">Many Stocks Trade At -5-5%</span></div>
-                <div class="metric-box"><span class="metric" id="${symbol}_operating_margin" onclick="showDetails('${symbol}', 'operating_margin')">Operating Margin</span><span class="value">${operatingMargin}</span><span class="comparison">Many Stocks Trade At 15-25%</span></div>
-                <div class="metric-box"><span class="metric" id="${symbol}_operating_margin_1yr_change" onclick="showDetails('${symbol}', 'operating_margin_1yr_change')">Operating Margin 1-Yr Change</span><span class="value">${operatingMargin1Yr.split(' ')[0]}</span><span class="comparison">Many Stocks Trade At -2-2%</span></div>
-                <div class="metric-box"><span class="metric" id="${symbol}_operating_margin_3yr_change" onclick="showDetails('${symbol}', 'operating_margin_3yr_change')">Operating Margin 3-Yr Change</span><span class="value">${operatingMargin3Yr.split(' ')[0]}</span><span class="comparison">Many Stocks Trade At -5-5%</span></div>
-                <div class="metric-box"><span class="metric" id="${symbol}_operating_margin_5yr_change" onclick="showDetails('${symbol}', 'operating_margin_5yr_change')">Operating Margin 5-Yr Change</span><span class="value">${operatingMargin5Yr.split(' ')[0]}</span><span class="comparison">Many Stocks Trade At -5-5%</span></div>
-                <div class="metric-box"><span class="metric" id="${symbol}_net_margin" onclick="showDetails('${symbol}', 'net_margin')">Net Margin</span><span class="value">${netMargin}</span><span class="comparison">Many Stocks Trade At 8-10%</span></div>
-                <div class="metric-box"><span class="metric" id="${symbol}_net_margin_1yr_change" onclick="showDetails('${symbol}', 'net_margin_1yr_change')">Net Margin 1-Yr Change</span><span class="value">${netMargin1Yr.split(' ')[0]}</span><span class="comparison">Many Stocks Trade At -2-2%</span></div>
-                <div class="metric-box"><span class="metric" id="${symbol}_net_margin_3yr_change" onclick="showDetails('${symbol}', 'net_margin_3yr_change')">Net Margin 3-Yr Change</span><span class="value">${netMargin3Yr.split(' ')[0]}</span><span class="comparison">Many Stocks Trade At -5-5%</span></div>
-                <div class="metric-box"><span class="metric" id="${symbol}_net_margin_5yr_change" onclick="showDetails('${symbol}', 'net_margin_5yr_change')">Net Margin 5-Yr Change</span><span class="value">${netMargin5Yr.split(' ')[0]}</span><span class="comparison">Many Stocks Trade At -5-5%</span></div>
-                <div class="metric-box"><span class="metric" id="${symbol}_rsi" onclick="showDetails('${symbol}', 'rsi')">RSI</span><span class="value">${rsi}</span><span class="comparison">Many Stocks Trade At 40-60</span></div>
-                <div class="metric-box"><span class="metric" id="${symbol}_mfi" onclick="showDetails('${symbol}', 'mfi')">MFI</span><span class="value">${mfi}</span><span class="comparison">Many Stocks Trade At 40-60</span></div>
-                <div class="metric-box"><span class="metric" id="${symbol}_price_vs_52wk_high" onclick="showDetails('${symbol}', 'price_vs_52wk_high')">Price vs 52-Wk High</span><span class="value">${priceVs52WkHigh}</span><span class="comparison">Many Stocks Trade At -10-10%</span></div>
-                <div class="metric-box"><span class="metric" id="${symbol}_price_vs_52wk_low" onclick="showDetails('${symbol}', 'price_vs_52wk_low')">Price vs 52-Wk Low</span><span class="value">${priceVs52WkLow}</span><span class="comparison">Many Stocks Trade At -10-10%</span></div>
-                <div class="metric-box"><span class="metric" id="${symbol}_bollinger_percent_20" onclick="showDetails('${symbol}', 'bollinger_percent_20')">Bollinger Percent 20</span><span class="value">${bollinger20}</span><span class="comparison">Many Stocks Trade At 20-80%</span></div>
-                <div class="metric-box"><span class="metric" id="${symbol}_bollinger_percent_50" onclick="showDetails('${symbol}', 'bollinger_percent_50')">Bollinger Percent 50</span><span class="value">${bollinger50}</span><span class="comparison">Many Stocks Trade At 20-80%</span></div>
-                <div class="metric-box"><span class="metric" id="${symbol}_price_vs_50day_avg" onclick="showDetails('${symbol}', 'price_vs_50day_avg')">Price vs 50-Day Avg</span><span class="value">${priceVs50DayAvg}</span><span class="comparison">Many Stocks Trade At -10-10%</span></div>
-                <div class="metric-box"><span class="metric" id="${symbol}_price_vs_200day_avg" onclick="showDetails('${symbol}', 'price_vs_200day_avg')">Price vs 200-Day Avg</span><span class="value">${priceVs200DayAvg}</span><span class="comparison">Many Stocks Trade At -15-15%</span></div>
+                <div class="metric-box"><span class="label metric" id="${symbol}_current_price" onclick="openChartWindow('${symbol}', 'current_price')">Current Price</span><span class="value">$${currentPriceFinal.toFixed(2)}</span></div>
+                <div class="metric-box"><span class="label metric" id="${symbol}_market_cap" onclick="openChartWindow('${symbol}', 'market_cap')">Market Cap</span><span class="value">$${(marketCap / 1e9).toFixed(2)}B</span></div>
+                <div class="metric-box"><span class="label metric" id="${symbol}_pe_ttm" onclick="openChartWindow('${symbol}', 'pe_ttm')">TTM PE</span><span class="value">${peTTM}</span></div>
+                <div class="metric-box"><span class="label metric" id="${symbol}_pe_forward" onclick="openChartWindow('${symbol}', 'pe_forward')">Forward PE</span><span class="value">${peForward}</span></div>
+                <div class="metric-box"><span class="label metric" id="${symbol}_price_to_sales" onclick="openChartWindow('${symbol}', 'price_to_sales')">TTM P/S Ratio</span><span class="value">${priceToSales}</span></div>
+                <div class="metric-box"><span class="label metric" id="${symbol}_price_to_book" onclick="openChartWindow('${symbol}', 'price_to_book')">Price to Book</span><span class="value">${priceToBook}</span></div>
+                <div class="metric-box"><span class="label metric" id="${symbol}_ev_ebitda" onclick="openChartWindow('${symbol}', 'ev_ebitda')">EV / EBITDA</span><span class="value">${evEbitda}</span></div>
+                <div class="metric-box"><span class="label metric" id="${symbol}_price_to_fcf" onclick="openChartWindow('${symbol}', 'price_to_fcf')">Price to FCF</span><span class="value">${priceToFCF}</span></div>
+                <div class="metric-box"><span class="label metric" id="${symbol}_ev_fcf" onclick="openChartWindow('${symbol}', 'ev_fcf')">EV / FCF</span><span class="value">${evFCF}</span></div>
+                <div class="metric-box"><span class="label metric" id="${symbol}_sales_growth_1yr" onclick="openChartWindow('${symbol}', 'sales_growth_1yr')">TTM Rev Growth</span><span class="value">${sales1Yr}</span></div>
+                <div class="metric-box"><span class="label metric" id="${symbol}_sales_growth_3yr" onclick="openChartWindow('${symbol}', 'sales_growth_3yr')">3-Yr Rev Growth</span><span class="value">${sales3Yr.value}</span></div>
+                <div class="metric-box"><span class="label metric" id="${symbol}_sales_growth_5yr" onclick="openChartWindow('${symbol}', 'sales_growth_5yr')">5-Yr Rev Growth</span><span class="value">${sales5Yr.value}</span></div>
+                <div class="metric-box"><span class="label metric" id="${symbol}_eps_growth_1yr" onclick="openChartWindow('${symbol}', 'eps_growth_1yr')">Current Yr Exp EPS Growth</span><span class="value">${eps1Yr}</span></div>
+                <div class="metric-box"><span class="label metric" id="${symbol}_eps_growth_3yr" onclick="openChartWindow('${symbol}', 'eps_growth_3yr')">3-Yr EPS Growth</span><span class="value">${eps3Yr.value}</span></div>
+                <div class="metric-box"><span class="label metric" id="${symbol}_eps_growth_5yr" onclick="openChartWindow('${symbol}', 'eps_growth_5yr')">5-Yr EPS Growth</span><span class="value">${eps5Yr.value}</span></div>
+                <div class="metric-box"><span class="label metric" id="${symbol}_ebitda_growth_1yr" onclick="openChartWindow('${symbol}', 'ebitda_growth_1yr')">Next Yr Exp Rev Growth</span><span class="value">${ebitda1Yr}</span></div>
+                <div class="metric-box"><span class="label metric" id="${symbol}_ebitda_growth_3yr" onclick="openChartWindow('${symbol}', 'ebitda_growth_3yr')">3-Yr EBITDA Growth</span><span class="value">${ebitda3Yr.value}</span></div>
+                <div class="metric-box"><span class="label metric" id="${symbol}_ebitda_growth_5yr" onclick="openChartWindow('${symbol}', 'ebitda_growth_5yr')">5-Yr EBITDA Growth</span><span class="value">${ebitda5Yr.value}</span></div>
+                <div class="metric-box"><span class="label metric" id="${symbol}_gross_margin" onclick="openChartWindow('${symbol}', 'gross_margin')">Gross Margin</span><span class="value">${grossMargin}</span></div>
+                <div class="metric-box"><span class="label metric" id="${symbol}_gross_margin_1yr_change" onclick="openChartWindow('${symbol}', 'gross_margin_1yr_change')">Gross Margin 1-Yr Change</span><span class="value">${grossMargin1Yr.split(' ')[0]}</span></div>
+                <div class="metric-box"><span class="label metric" id="${symbol}_gross_margin_3yr_change" onclick="openChartWindow('${symbol}', 'gross_margin_3yr_change')">Gross Margin 3-Yr Change</span><span class="value">${grossMargin3Yr.split(' ')[0]}</span></div>
+                <div class="metric-box"><span class="label metric" id="${symbol}_gross_margin_5yr_change" onclick="openChartWindow('${symbol}', 'gross_margin_5yr_change')">Gross Margin 5-Yr Change</span><span class="value">${grossMargin5Yr.split(' ')[0]}</span></div>
+                <div class="metric-box"><span class="label metric" id="${symbol}_operating_margin" onclick="openChartWindow('${symbol}', 'operating_margin')">Operating Margin</span><span class="value">${operatingMargin}</span></div>
+                <div class="metric-box"><span class="label metric" id="${symbol}_operating_margin_1yr_change" onclick="openChartWindow('${symbol}', 'operating_margin_1yr_change')">Operating Margin 1-Yr Change</span><span class="value">${operatingMargin1Yr.split(' ')[0]}</span></div>
+                <div class="metric-box"><span class="label metric" id="${symbol}_operating_margin_3yr_change" onclick="openChartWindow('${symbol}', 'operating_margin_3yr_change')">Operating Margin 3-Yr Change</span><span class="value">${operatingMargin3Yr.split(' ')[0]}</span></div>
+                <div class="metric-box"><span class="label metric" id="${symbol}_operating_margin_5yr_change" onclick="openChartWindow('${symbol}', 'operating_margin_5yr_change')">Operating Margin 5-Yr Change</span><span class="value">${operatingMargin5Yr.split(' ')[0]}</span></div>
+                <div class="metric-box"><span class="label metric" id="${symbol}_net_margin" onclick="openChartWindow('${symbol}', 'net_margin')">Net Margin</span><span class="value">${netMargin}</span></div>
+                <div class="metric-box"><span class="label metric" id="${symbol}_net_margin_1yr_change" onclick="openChartWindow('${symbol}', 'net_margin_1yr_change')">Net Margin 1-Yr Change</span><span class="value">${netMargin1Yr.split(' ')[0]}</span></div>
+                <div class="metric-box"><span class="label metric" id="${symbol}_net_margin_3yr_change" onclick="openChartWindow('${symbol}', 'net_margin_3yr_change')">Net Margin 3-Yr Change</span><span class="value">${netMargin3Yr.split(' ')[0]}</span></div>
+                <div class="metric-box"><span class="label metric" id="${symbol}_net_margin_5yr_change" onclick="openChartWindow('${symbol}', 'net_margin_5yr_change')">Net Margin 5-Yr Change</span><span class="value">${netMargin5Yr.split(' ')[0]}</span></div>
+                <div class="metric-box"><span class="label metric" id="${symbol}_rsi" onclick="openChartWindow('${symbol}', 'rsi')">RSI</span><span class="value">${rsi}</span></div>
+                <div class="metric-box"><span class="label metric" id="${symbol}_mfi" onclick="openChartWindow('${symbol}', 'mfi')">MFI</span><span class="value">${mfi}</span></div>
+                <div class="metric-box"><span class="label metric" id="${symbol}_price_vs_52wk_high" onclick="openChartWindow('${symbol}', 'price_vs_52wk_high')">Price vs 52-Wk High</span><span class="value">${priceVs52WkHigh}</span></div>
+                <div class="metric-box"><span class="label metric" id="${symbol}_price_vs_52wk_low" onclick="openChartWindow('${symbol}', 'price_vs_52wk_low')">Price vs 52-Wk Low</span><span class="value">${priceVs52WkLow}</span></div>
+                <div class="metric-box"><span class="label metric" id="${symbol}_bollinger_percent_20" onclick="openChartWindow('${symbol}', 'bollinger_percent_20')">Bollinger Percent 20</span><span class="value">${bollinger20}</span></div>
+                <div class="metric-box"><span class="label metric" id="${symbol}_bollinger_percent_50" onclick="openChartWindow('${symbol}', 'bollinger_percent_50')">Bollinger Percent 50</span><span class="value">${bollinger50}</span></div>
+                <div class="metric-box"><span class="label metric" id="${symbol}_price_vs_50day_avg" onclick="openChartWindow('${symbol}', 'price_vs_50day_avg')">Price vs 50-Day Avg</span><span class="value">${priceVs50DayAvg}</span></div>
+                <div class="metric-box"><span class="label metric" id="${symbol}_price_vs_200day_avg" onclick="openChartWindow('${symbol}', 'price_vs_200day_avg')">Price vs 200-Day Avg</span><span class="value">${priceVs200DayAvg}</span></div>
             </div>
         `;
     })
@@ -308,6 +547,7 @@ function fetchData() {
 function clearResults() {
     document.getElementById('results').innerHTML = '';
     metricDetails = {};
+    historicalData = {};
 }
 
 document.getElementById('fetchBtn').addEventListener('click', fetchData);
