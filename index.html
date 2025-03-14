@@ -12,7 +12,7 @@
             font-family: Arial, sans-serif;
         }
         .container {
-            max-width: 1200px;
+            max-width: 800px;
             padding: 20px;
         }
         .search-box {
@@ -46,14 +46,13 @@
             margin-top: 20px;
         }
         .ticker-section {
-            background: url('https://via.placeholder.com/1200x800') no-repeat center center;
+            background: url('https://via.placeholder.com/800x600') no-repeat center center;
             background-size: cover;
             padding: 20px;
             border-radius: 10px;
             margin-bottom: 20px;
         }
         .ticker-column {
-            flex: 1;
             padding: 15px;
             background: rgba(0, 0, 0, 0.7);
             border-radius: 10px;
@@ -92,18 +91,16 @@
 <body>
     <div class="container">
         <div class="text-center mb-4">
-            <img src="https://via.placeholder.com/100x50" alt="1000xStocks Logo" class="mb-2">
             <div class="search-box">
                 <span>SEARCH STOCK</span>
-                <input type="text" id="symbols" placeholder="e.g., AMD, NVDA, TSLA">
+                <input type="text" id="symbol" placeholder="e.g., AMD">
                 <button id="fetchBtn"><span class="visually-hidden">Search</span>🔍</button>
             </div>
-            <img src="https://via.placeholder.com/100x50" alt="1000xStocks Logo" class="mt-2">
         </div>
         <div id="loading">
             <div class="spinner-border text-warning" role="status"><span class="visually-hidden">Loading...</span></div>
         </div>
-        <div id="results" class="ticker-section d-flex justify-content-between"></div>
+        <div id="results" class="ticker-section"></div>
     </div>
 
     <!-- Modal for Details -->
