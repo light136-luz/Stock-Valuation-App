@@ -16,7 +16,7 @@
             padding: 20px;
         }
         .search-box {
-            background-color: #ffcc00;
+            background-color: #ff8c00; /* Changed from gold (#ffcc00) to orange (#ff8c00) */
             color: #1a1a1a;
             padding: 10px 20px;
             border-radius: 20px;
@@ -66,17 +66,18 @@
             display: flex;
             justify-content: space-between;
         }
-        .metric-box .value {
-            font-weight: bold;
-            color: #ffcc00;
+        .metric-box .label {
+            flex: 1;
         }
-        .metric-box .comparison {
-            color: #ccc;
-            font-size: 0.8em;
+        .metric-box .value {
+            flex: 1;
+            font-weight: bold;
+            color: #ff8c00; /* Changed to orange */
+            text-align: center;
         }
         .prominent-metric {
             font-size: 1.2em;
-            background-color: #ffcc00;
+            background-color: #ff8c00; /* Changed to orange */
             color: #1a1a1a;
             padding: 15px;
             margin-bottom: 15px;
@@ -91,11 +92,13 @@
 <body>
     <div class="container">
         <div class="text-center mb-4">
-            <div class="search-box">
-                <span>SEARCH STOCK</span>
-                <input type="text" id="symbol" placeholder="e.g., AMD">
-                <button id="fetchBtn"><span class="visually-hidden">Search</span>🔍</button>
-            </div>
+            <form id="searchForm" onsubmit="event.preventDefault(); fetchData();">
+                <div class="search-box">
+                    <span>SEARCH STOCK</span>
+                    <input type="text" id="symbol" placeholder="e.g., AMD">
+                    <button type="submit" id="fetchBtn"><span class="visually-hidden">Search</span>🔍</button>
+                </div>
+            </form>
         </div>
         <div id="loading">
             <div class="spinner-border text-warning" role="status"><span class="visually-hidden">Loading...</span></div>
@@ -118,6 +121,7 @@
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="scripts.js"></script>
 </body>
 </html>
