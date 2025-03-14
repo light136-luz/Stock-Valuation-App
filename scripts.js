@@ -83,12 +83,14 @@ function showDetails(symbol, metricId) {
 function openChartWindow(symbol, metricId) {
     const metricName = document.getElementById(`${symbol}_${metricId}`).innerText.split(':')[0];
     const chartWindow = window.open('', '_blank', 'width=800,height=600');
+    const chartJsScript = `
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    `;
     chartWindow.document.write(`
         <!DOCTYPE html>
         <html>
         <head>
             <title>${symbol} - ${metricName} Chart</title>
-            <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
             <style>
                 body { font-family: Arial, sans-serif; background-color: #1a1a1a; color: #fff; padding: 20px; }
                 .chart-container { background: rgba(0, 0, 0, 0.7); padding: 20px; border-radius: 10px; }
@@ -104,10 +106,16 @@ function openChartWindow(symbol, metricId) {
             <div class="chart-container">
                 <canvas id="metricChart"></canvas>
             </div>
+            ${chartJsScript}
             <script>
                 let chart;
                 function updateChart(symbol, metricId, type) {
                     const data = window.opener.getChartData(symbol, metricId, type);
+                    console.log('Chart Data:', data); // Debug log
+                    if (!data || data.labels.length === 0 || data.values.length === 0) {
+                        document.body.innerHTML += '<p>No data available for this metric.</p>';
+                        return;
+                    }
                     const ctx = document.getElementById('metricChart').getContext('2d');
                     if (chart) chart.destroy();
                     chart = new Chart(ctx, {
@@ -329,7 +337,7 @@ function fetchData() {
     const balanceSheetUrl = `https://www.alphavantage.co/query?function=BALANCE_SHEET&symbol=${symbol}&apikey=${apikey}`;
     const incomeStatementUrl = `https://www.alphavantage.co/query?function=INCOME_STATEMENT&symbol=${symbol}&apikey=${apikey}`;
     const dailyUrl = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&outputsize=full&apikey=${apikey}`;
-    const incomeStatementQuarterlyUrl = `https://www.alphavantage.co/query?function=INCOME_STATEMENT&symbol=${symbol}&apikey=${apikey}`;
+    const incomeStatementQuarterlyUrl = `https://www.alphavantage.co/query?function=INCOME_STATEMENT&symbol=${symbol}&apikey=${apikey}&interval=quarterly`;
 
     Promise.all([
         fetch(overviewUrl).then(res => res.json()),
