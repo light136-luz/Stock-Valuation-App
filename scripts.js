@@ -83,9 +83,6 @@ function showDetails(symbol, metricId) {
 function openChartWindow(symbol, metricId) {
     const metricName = document.getElementById(`${symbol}_${metricId}`).innerText.split(':')[0];
     const chartWindow = window.open('', '_blank', 'width=800,height=600');
-    const chartJsScript = `
-        <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
-    `;
     const initialData = getChartData(symbol, metricId, 'yearly');
     chartWindow.document.write(`
         <!DOCTYPE html>
@@ -107,8 +104,9 @@ function openChartWindow(symbol, metricId) {
             <div class="chart-container">
                 <canvas id="metricChart"></canvas>
             </div>
-            ${chartJsScript}
             <script>
+                // Embed Chart.js directly (simplified for now)
+                ${Chart.toString()}
                 let chart;
                 function updateChart(symbol, metricId, type) {
                     const data = window.opener.getChartData(symbol, metricId, type);
