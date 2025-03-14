@@ -1,4 +1,5 @@
 let isFetching = false;
+let metricDetails = {};
 
 function calculateGrowthRate(current, previous) {
     if (!current || !previous || previous === 0) return 'N/A';
@@ -8,18 +9,23 @@ function calculateGrowthRate(current, previous) {
 function calculateAvgGrowth(data, years, field) {
     if (data.length < years + 1) return 'N/A';
     let totalGrowth = 0;
+    let details = [];
     for (let i = 0; i < years; i++) {
         const current = parseFloat(data[i][field]) || 0;
         const previous = parseFloat(data[i + 1][field]) || 0;
         if (previous === 0) return 'N/A';
-        totalGrowth += (current - previous) / previous;
+        const growth = (current - previous) / previous;
+        totalGrowth += growth;
+        details.push(`${data[i].fiscalDateEnding}: ${(growth * 100).toFixed(2)}%`);
     }
-    return ((totalGrowth / years) * 100).toFixed(2) + '%';
+    const avg = ((totalGrowth / years) * 100).toFixed(2) + '%';
+    return { value: avg, details: details.join('<br>') };
 }
 
-function calculateMarginChange(currentMargin, pastMargin) {
+function calculateMarginChange(currentMargin, pastMargin, yearsBack) {
     if (!currentMargin || !pastMargin) return 'N/A';
-    return (currentMargin - pastMargin).toFixed(2) + '%';
+    const change = (currentMargin - pastMargin).toFixed(2);
+    return `${change}% (${yearsBack}-Yr Change)`;
 }
 
 function calculateRSI(prices) {
@@ -66,111 +72,11 @@ function calculateSMA(prices, period) {
     return prices.slice(0, period).reduce((a, b) => a + b, 0) / period;
 }
 
-async function fetchTickerData(symbol, apikey) {
-    const urls = [
-        `https://www.alphavantage.co/query?function=OVERVIEW&symbol=${symbol}&apikey=${apikey}`,
-        `https://www.alphavantage.co/query?function=CASH_FLOW&symbol=${symbol}&apikey=${apikey}`,
-        `https://www.alphavantage.co/query?function=BALANCE_SHEET&symbol=${symbol}&apikey=${apikey}`,
-        `https://www.alphavantage.co/query?function=INCOME_STATEMENT&symbol=${symbol}&apikey=${apikey}`,
-        `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&outputsize=full&apikey=${apikey}`
-    ];
-
-    const responses = await Promise.all(urls.map(url => fetch(url).then(res => res.json())));
-    const [overviewData, cashFlowData, balanceSheetData, incomeStatementData, dailyData] = responses;
-
-    if (overviewData.Information || overviewData.Note) throw new Error(`API rate limit exceeded for ${symbol}`);
-    if (Object.keys(overviewData).length === 0) throw new Error(`No data for ${symbol}`);
-
-    // Valuation Metrics
-    const metrics = {
-        pe_ttm: overviewData.TrailingPE || 'N/A',
-        pe_forward: overviewData.ForwardPE || 'N/A',
-        price_to_sales: overviewData.PriceToSalesRatioTTM || 'N/A',
-        price_to_book: overviewData.PriceToBookRatio || 'N/A',
-        ev_ebitda: overviewData.EVToEBITDA || 'N/A'
-    };
-    const marketCap = parseFloat(overviewData.MarketCapitalization) || 0;
-
-    // Balance Sheet & Cash Flow
-    const latestBalance = balanceSheetData.annualReports?.[0] || {};
-    const longTermDebt = parseFloat(latestBalance.longTermDebt) || 0;
-    const shortTermDebt = parseFloat(latestBalance.shortLongTermDebtTotal) || 0;
-    const cash = parseFloat(latestBalance.cashAndCashEquivalentsAtCarryingValue) || 0;
-    const totalDebt = longTermDebt + shortTermDebt;
-    const ev = marketCap + totalDebt - cash;
-
-    const fcf = parseFloat(cashFlowData.annualReports?.[0]?.operatingCashflow) || 0;
-    metrics.price_to_fcf = (fcf && marketCap) ? (marketCap / fcf).toFixed(2) : 'N/A';
-    metrics.ev_fcf = (fcf && ev) ? (ev / fcf).toFixed(2) : 'N/A';
-
-    // Income Statement & Growth
-    const incomeReports = incomeStatementData.annualReports || [];
-    const balanceReports = balanceSheetData.annualReports || [];
-    const epsData = incomeReports.map((income, i) => {
-        const matchingBalance = balanceReports.find(b => b.fiscalDateEnding === income.fiscalDateEnding) || {};
-        const netIncome = parseFloat(income.netIncome) || 0;
-        const shares = parseFloat(matchingBalance.commonStockSharesOutstanding) || parseFloat(overviewData.SharesOutstanding) || 0;
-        return shares ? netIncome / shares : 0;
-    });
-
-    const sales = incomeReports.map(r => parseFloat(r.totalRevenue) || 0);
-    const ebitda = incomeReports.map(r => parseFloat(r.ebitda) || (parseFloat(r.operatingIncome) + parseFloat(r.depreciationAndAmortization)) || 0);
-    metrics.sales_growth_1yr = calculateGrowthRate(sales[0], sales[1]);
-    metrics.sales_growth_3yr = calculateAvgGrowth(incomeReports, 3, 'totalRevenue');
-    metrics.sales_growth_5yr = calculateAvgGrowth(incomeReports, 5, 'totalRevenue');
-    metrics.eps_growth_1yr = calculateGrowthRate(epsData[0], epsData[1]);
-    metrics.eps_growth_3yr = calculateAvgGrowth(epsData.map((eps, i) => ({ eps, fiscalDateEnding: incomeReports[i]?.fiscalDateEnding })), 3, 'eps');
-    metrics.eps_growth_5yr = calculateAvgGrowth(epsData.map((eps, i) => ({ eps, fiscalDateEnding: incomeReports[i]?.fiscalDateEnding })), 5, 'eps');
-    metrics.ebitda_growth_1yr = calculateGrowthRate(ebitda[0], ebitda[1]);
-    metrics.ebitda_growth_3yr = calculateAvgGrowth(incomeReports, 3, 'ebitda');
-    metrics.ebitda_growth_5yr = calculateAvgGrowth(incomeReports, 5, 'ebitda');
-
-    // Profitability
-    const grossProfit = incomeReports.map(r => parseFloat(r.grossProfit) || 0);
-    const operatingIncome = incomeReports.map(r => parseFloat(r.operatingIncome) || 0);
-    const netIncome = incomeReports.map(r => parseFloat(r.netIncome) || 0);
-    const revenue = incomeReports.map(r => parseFloat(r.totalRevenue) || 0);
-
-    const grossMargins = revenue.map((rev, i) => rev ? (grossProfit[i] / rev * 100) : 0);
-    const operatingMargins = revenue.map((rev, i) => rev ? (operatingIncome[i] / rev * 100) : 0);
-    const netMargins = revenue.map((rev, i) => rev ? (netIncome[i] / rev * 100) : 0);
-
-    metrics.gross_margin = grossMargins[0] ? grossMargins[0].toFixed(2) + '%' : 'N/A';
-    metrics.gross_margin_1yr_change = calculateMarginChange(grossMargins[0], grossMargins[1]);
-    metrics.gross_margin_3yr_change = calculateMarginChange(grossMargins[0], grossMargins[2]);
-    metrics.gross_margin_5yr_change = calculateMarginChange(grossMargins[0], grossMargins[4]);
-    metrics.operating_margin = operatingMargins[0] ? operatingMargins[0].toFixed(2) + '%' : 'N/A';
-    metrics.operating_margin_1yr_change = calculateMarginChange(operatingMargins[0], operatingMargins[1]);
-    metrics.operating_margin_3yr_change = calculateMarginChange(operatingMargins[0], operatingMargins[2]);
-    metrics.operating_margin_5yr_change = calculateMarginChange(operatingMargins[0], operatingMargins[4]);
-    metrics.net_margin = netMargins[0] ? netMargins[0].toFixed(2) + '%' : 'N/A';
-    metrics.net_margin_1yr_change = calculateMarginChange(netMargins[0], netMargins[1]);
-    metrics.net_margin_3yr_change = calculateMarginChange(netMargins[0], netMargins[2]);
-    metrics.net_margin_5yr_change = calculateMarginChange(netMargins[0], netMargins[4]);
-
-    // Technical Metrics
-    const timeSeries = dailyData['Time Series (Daily)'] || {};
-    const dates = Object.keys(timeSeries).sort().reverse();
-    const closes = dates.map(date => parseFloat(timeSeries[date]['4. close']) || 0);
-    const highs = dates.map(date => parseFloat(timeSeries[date]['2. high']) || 0);
-    const lows = dates.map(date => parseFloat(timeSeries[date]['3. low']) || 0);
-    const volumes = dates.map(date => parseFloat(timeSeries[date]['5. volume']) || 0);
-
-    const currentPrice = closes[0] || 0;
-    metrics.rsi = calculateRSI(closes);
-    metrics.mfi = calculateMFI(highs, lows, closes, volumes);
-    const yearHigh = closes.length > 252 ? Math.max(...closes.slice(0, 252)) : 0;
-    const yearLow = closes.length > 252 ? Math.min(...closes.slice(0, 252)) : 0;
-    metrics.price_vs_52wk_high = yearHigh ? ((currentPrice / yearHigh) * 100 - 100).toFixed(2) + '%' : 'N/A';
-    metrics.price_vs_52wk_low = yearLow ? ((currentPrice / yearLow) * 100 - 100).toFixed(2) + '%' : 'N/A';
-    metrics.bollinger_percent_20 = calculateBollingerPercent(closes, 20);
-    metrics.bollinger_percent_50 = calculateBollingerPercent(closes, 50);
-    const sma50 = calculateSMA(closes, 50);
-    const sma200 = calculateSMA(closes, 200);
-    metrics.price_vs_50day_avg = sma50 ? ((currentPrice / sma50) * 100 - 100).toFixed(2) + '%' : 'N/A';
-    metrics.price_vs_200day_avg = sma200 ? ((currentPrice / sma200) * 100 - 100).toFixed(2) + '%' : 'N/A';
-
-    return metrics;
+function showDetails(ticker, metricId) {
+    const details = metricDetails[ticker]?.[metricId] || 'No details available.';
+    document.getElementById('metricModalLabel').innerText = `${ticker} - ${document.getElementById(`${ticker}_${metricId}`).innerText.split(':')[0]} Details`;
+    document.getElementById('metricDetails').innerHTML = details;
+    $('#metricModal').modal('show');
 }
 
 function fetchData() {
@@ -179,90 +85,226 @@ function fetchData() {
         return;
     }
 
-    const symbols = [
-        document.getElementById('symbol1').value.trim().toUpperCase(),
-        document.getElementById('symbol2').value.trim().toUpperCase(),
-        document.getElementById('symbol3').value.trim().toUpperCase(),
-        document.getElementById('symbol4').value.trim().toUpperCase(),
-        document.getElementById('symbol5').value.trim().toUpperCase()
-    ].filter(symbol => symbol);
-
-    if (symbols.length === 0) {
-        alert('Please enter at least one stock symbol!');
+    const symbolsInput = document.getElementById('symbols').value.trim().toUpperCase();
+    const symbols = symbolsInput.split(',').map(s => s.trim()).filter(s => s).slice(0, 5);
+    if (symbols.length < 3) {
+        alert('Please enter at least 3 tickers separated by commas (e.g., AMD, NVDA, TSLA)');
         return;
     }
+    const displayedSymbols = symbols.slice(0, 3); // Display only 3 for now
 
     const apikey = 'EUIL8JU2T0UFCZRR';
     const fetchBtn = document.getElementById('fetchBtn');
     document.getElementById('loading').style.display = 'block';
     fetchBtn.disabled = true;
     isFetching = true;
-    document.getElementById('resultsBody').innerHTML = '';
+    clearResults();
 
-    // Set ticker headers
-    for (let i = 1; i <= 5; i++) {
-        document.getElementById(`ticker${i}`).innerText = symbols[i - 1] || `Ticker ${i}`;
-    }
+    const tickerPromises = displayedSymbols.map(symbol => {
+        const overviewUrl = `https://www.alphavantage.co/query?function=OVERVIEW&symbol=${symbol}&apikey=${apikey}`;
+        const cashFlowUrl = `https://www.alphavantage.co/query?function=CASH_FLOW&symbol=${symbol}&apikey=${apikey}`;
+        const balanceSheetUrl = `https://www.alphavantage.co/query?function=BALANCE_SHEET&symbol=${symbol}&apikey=${apikey}`;
+        const incomeStatementUrl = `https://www.alphavantage.co/query?function=INCOME_STATEMENT&symbol=${symbol}&apikey=${apikey}`;
+        const dailyUrl = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&outputsize=full&apikey=${apikey}`;
 
-    Promise.all(symbols.map(symbol => fetchTickerData(symbol, apikey).catch(err => ({ error: err.message, symbol }))))
-        .then(results => {
-            const metricOrder = [
-                'pe_ttm', 'pe_forward', 'price_to_sales', 'price_to_book', 'ev_ebitda', 'price_to_fcf', 'ev_fcf',
-                'sales_growth_1yr', 'sales_growth_3yr', 'sales_growth_5yr',
-                'eps_growth_1yr', 'eps_growth_3yr', 'eps_growth_5yr',
-                'ebitda_growth_1yr', 'ebitda_growth_3yr', 'ebitda_growth_5yr',
-                'gross_margin', 'gross_margin_1yr_change', 'gross_margin_3yr_change', 'gross_margin_5yr_change',
-                'operating_margin', 'operating_margin_1yr_change', 'operating_margin_3yr_change', 'operating_margin_5yr_change',
-                'net_margin', 'net_margin_1yr_change', 'net_margin_3yr_change', 'net_margin_5yr_change',
-                'rsi', 'mfi', 'price_vs_52wk_high', 'price_vs_52wk_low',
-                'bollinger_percent_20', 'bollinger_percent_50', 'price_vs_50day_avg', 'price_vs_200day_avg'
-            ];
+        return Promise.all([
+            fetch(overviewUrl).then(res => res.json()),
+            fetch(cashFlowUrl).then(res => res.json()),
+            fetch(balanceSheetUrl).then(res => res.json()),
+            fetch(incomeStatementUrl).then(res => res.json()),
+            fetch(dailyUrl).then(res => res.json())
+        ])
+        .then(([overviewData, cashFlowData, balanceSheetData, incomeStatementData, dailyData]) => {
+            metricDetails[symbol] = {};
 
-            const metricLabels = {
-                pe_ttm: 'PE TTM', pe_forward: 'PE Forward', price_to_sales: 'Price to Sales', price_to_book: 'Price to Book',
-                ev_ebitda: 'EV / EBITDA', price_to_fcf: 'Price to FCF', ev_fcf: 'EV / FCF',
-                sales_growth_1yr: 'Sales Growth 1-Yr', sales_growth_3yr: 'Sales Growth 3-Yr', sales_growth_5yr: 'Sales Growth 5-Yr',
-                eps_growth_1yr: 'EPS Growth 1-Yr', eps_growth_3yr: 'EPS Growth 3-Yr', eps_growth_5yr: 'EPS Growth 5-Yr',
-                ebitda_growth_1yr: 'EBITDA Growth 1-Yr', ebitda_growth_3yr: 'EBITDA Growth 3-Yr', ebitda_growth_5yr: 'EBITDA Growth 5-Yr',
-                gross_margin: 'Gross Margin', gross_margin_1yr_change: 'Gross Margin 1-Yr Change', gross_margin_3yr_change: 'Gross Margin 3-Yr Change',
-                gross_margin_5yr_change: 'Gross Margin 5-Yr Change', operating_margin: 'Operating Margin',
-                operating_margin_1yr_change: 'Operating Margin 1-Yr Change', operating_margin_3yr_change: 'Operating Margin 3-Yr Change',
-                operating_margin_5yr_change: 'Operating Margin 5-Yr Change', net_margin: 'Net Margin',
-                net_margin_1yr_change: 'Net Margin 1-Yr Change', net_margin_3yr_change: 'Net Margin 3-Yr Change',
-                net_margin_5yr_change: 'Net Margin 5-Yr Change', rsi: 'RSI', mfi: 'MFI',
-                price_vs_52wk_high: 'Price vs 52-Wk High', price_vs_52wk_low: 'Price vs 52-Wk Low',
-                bollinger_percent_20: 'Bollinger Percent 20', bollinger_percent_50: 'Bollinger Percent 50',
-                price_vs_50day_avg: 'Price vs 50-Day Avg', price_vs_200day_avg: 'Price vs 200-Day Avg'
-            };
+            // OVERVIEW
+            if (overviewData.Information || overviewData.Note) throw new Error(`API rate limit exceeded for ${symbol}`);
+            if (Object.keys(overviewData).length === 0) throw new Error(`No data returned for ${symbol}`);
 
-            const tbody = document.getElementById('resultsBody');
-            metricOrder.forEach(metric => {
-                const row = document.createElement('tr');
-                const labelCell = document.createElement('td');
-                labelCell.className = 'metric-label';
-                labelCell.innerText = metricLabels[metric];
-                row.appendChild(labelCell);
+            const currentPrice = parseFloat(dailyData['Time Series (Daily)']?.[Object.keys(dailyData['Time Series (Daily)'] || {})[0]]?.['4. close']) || 0;
+            const marketCap = parseFloat(overviewData.MarketCapitalization) || 0;
+            const peTTM = overviewData.TrailingPE || 'N/A';
+            const peForward = overviewData.ForwardPE || 'N/A';
+            const priceToSales = overviewData.PriceToSalesRatioTTM || 'N/A';
+            const priceToBook = overviewData.PriceToBookRatio || 'N/A';
+            const evEbitda = overviewData.EVToEBITDA || 'N/A';
+            const latestBalance = balanceSheetData.annualReports?.[0] || {};
+            const longTermDebt = parseFloat(latestBalance.longTermDebt) || 0;
+            const shortTermDebt = parseFloat(latestBalance.shortLongTermDebtTotal) || 0;
+            const cash = parseFloat(latestBalance.cashAndCashEquivalentsAtCarryingValue) || 0;
+            const totalDebt = longTermDebt + shortTermDebt;
+            const ev = marketCap + totalDebt - cash;
 
-                for (let i = 0; i < 5; i++) {
-                    const cell = document.createElement('td');
-                    if (i < results.length) {
-                        const result = results[i];
-                        cell.innerText = result.error ? `Error: ${result.error}` : (result[metric] || 'N/A');
-                    } else {
-                        cell.innerText = '';
-                    }
-                    row.appendChild(cell);
-                }
-                tbody.appendChild(row);
+            let priceToFCF = 'N/A';
+            let evFCF = 'N/A';
+            if (cashFlowData.annualReports && cashFlowData.annualReports.length > 0) {
+                const fcfRaw = cashFlowData.annualReports[0].operatingCashflow || '0';
+                const fcf = parseFloat(fcfRaw) || 0;
+                if (fcf && marketCap) priceToFCF = (marketCap / fcf).toFixed(2);
+                if (fcf && ev) evFCF = (ev / fcf).toFixed(2);
+            }
+
+            const incomeReports = incomeStatementData.annualReports || [];
+            const balanceReports = balanceSheetData.annualReports || [];
+            const epsData = incomeReports.map((income, i) => {
+                const matchingBalance = balanceReports.find(b => b.fiscalDateEnding === income.fiscalDateEnding) || {};
+                const netIncome = parseFloat(income.netIncome) || 0;
+                const shares = parseFloat(matchingBalance.commonStockSharesOutstanding) || parseFloat(overviewData.SharesOutstanding) || 0;
+                return shares ? { eps: netIncome / shares, fiscalDateEnding: income.fiscalDateEnding } : { eps: 0, fiscalDateEnding: income.fiscalDateEnding };
             });
-        })
-        .catch(error => {
-            console.error('Fetch Error:', error);
-            alert('An error occurred. Check console for details.');
-        })
-        .finally(() => {
-            document.getElementById('loading').style.display = 'none';
-            fetchBtn.disabled = false;
-            setTimeout(() => { isFetching = false; }, 15000);
+
+            const sales = incomeReports.map(r => parseFloat(r.totalRevenue) || 0);
+            const ebitda = incomeReports.map(r => parseFloat(r.ebitda) || (parseFloat(r.operatingIncome) + parseFloat(r.depreciationAndAmortization)) || 0);
+
+            const sales1Yr = calculateGrowthRate(sales[0], sales[1]);
+            const sales3Yr = calculateAvgGrowth(incomeReports, 3, 'totalRevenue');
+            const sales5Yr = calculateAvgGrowth(incomeReports, 5, 'totalRevenue');
+            const eps1Yr = calculateGrowthRate(epsData[0].eps, epsData[1].eps);
+            const eps3Yr = calculateAvgGrowth(epsData, 3, 'eps');
+            const eps5Yr = calculateAvgGrowth(epsData, 5, 'eps');
+            const ebitda1Yr = calculateGrowthRate(ebitda[0], ebitda[1]);
+            const ebitda3Yr = calculateAvgGrowth(incomeReports, 3, 'ebitda');
+            const ebitda5Yr = calculateAvgGrowth(incomeReports, 5, 'ebitda');
+
+            const grossProfit = incomeReports.map(r => parseFloat(r.grossProfit) || 0);
+            const operatingIncome = incomeReports.map(r => parseFloat(r.operatingIncome) || 0);
+            const netIncome = incomeReports.map(r => parseFloat(r.netIncome) || 0);
+            const revenue = incomeReports.map(r => parseFloat(r.totalRevenue) || 0);
+            const grossMargins = revenue.map((rev, i) => rev ? (grossProfit[i] / rev * 100) : 0);
+            const operatingMargins = revenue.map((rev, i) => rev ? (operatingIncome[i] / rev * 100) : 0);
+            const netMargins = revenue.map((rev, i) => rev ? (netIncome[i] / rev * 100) : 0);
+
+            const grossMargin = grossMargins[0] ? grossMargins[0].toFixed(2) + '%' : 'N/A';
+            const grossMargin1Yr = calculateMarginChange(grossMargins[0], grossMargins[1], 1);
+            const grossMargin3Yr = calculateMarginChange(grossMargins[0], grossMargins[2], 3);
+            const grossMargin5Yr = calculateMarginChange(grossMargins[0], grossMargins[4], 5);
+            const operatingMargin = operatingMargins[0] ? operatingMargins[0].toFixed(2) + '%' : 'N/A';
+            const operatingMargin1Yr = calculateMarginChange(operatingMargins[0], operatingMargins[1], 1);
+            const operatingMargin3Yr = calculateMarginChange(operatingMargins[0], operatingMargins[2], 3);
+            const operatingMargin5Yr = calculateMarginChange(operatingMargins[0], operatingMargins[4], 5);
+            const netMargin = netMargins[0] ? netMargins[0].toFixed(2) + '%' : 'N/A';
+            const netMargin1Yr = calculateMarginChange(netMargins[0], netMargins[1], 1);
+            const netMargin3Yr = calculateMarginChange(netMargins[0], netMargins[2], 3);
+            const netMargin5Yr = calculateMarginChange(netMargins[0], netMargins[4], 5);
+
+            const timeSeries = dailyData['Time Series (Daily)'] || {};
+            const dates = Object.keys(timeSeries).sort().reverse();
+            const closes = dates.map(date => parseFloat(timeSeries[date]['4. close']) || 0);
+            const highs = dates.map(date => parseFloat(timeSeries[date]['2. high']) || 0);
+            const lows = dates.map(date => parseFloat(timeSeries[date]['3. low']) || 0);
+            const volumes = dates.map(date => parseFloat(timeSeries[date]['5. volume']) || 0);
+
+            const currentPriceFinal = closes[0] || 0;
+            const rsi = calculateRSI(closes);
+            const mfi = calculateMFI(highs, lows, closes, volumes);
+            const yearHigh = closes.length > 252 ? Math.max(...closes.slice(0, 252)) : 0;
+            const yearLow = closes.length > 252 ? Math.min(...closes.slice(0, 252)) : 0;
+            const priceVs52WkHigh = yearHigh ? ((currentPriceFinal / yearHigh) * 100 - 100).toFixed(2) + '%' : 'N/A';
+            const priceVs52WkLow = yearLow ? ((currentPriceFinal / yearLow) * 100 - 100).toFixed(2) + '%' : 'N/A';
+            const bollinger20 = calculateBollingerPercent(closes, 20);
+            const bollinger50 = calculateBollingerPercent(closes, 50);
+            const sma50 = calculateSMA(closes, 50);
+            const sma200 = calculateSMA(closes, 200);
+            const priceVs50DayAvg = sma50 ? ((currentPriceFinal / sma50) * 100 - 100).toFixed(2) + '%' : 'N/A';
+            const priceVs200DayAvg = sma200 ? ((currentPriceFinal / sma200) * 100 - 100).toFixed(2) + '%' : 'N/A';
+
+            metricDetails[symbol]['current_price'] = `Current Price: $${currentPriceFinal.toFixed(2)}`;
+            metricDetails[symbol]['market_cap'] = `Market Cap: $${(marketCap / 1e9).toFixed(2)}B`;
+            metricDetails[symbol]['pe_ttm'] = `TTM PE: ${peTTM}`;
+            metricDetails[symbol]['pe_forward'] = `Forward PE: ${peForward}`;
+            metricDetails[symbol]['price_to_sales'] = `TTM P/S Ratio: ${priceToSales}`;
+            metricDetails[symbol]['price_to_book'] = `Price to Book: ${priceToBook}`;
+            metricDetails[symbol]['ev_ebitda'] = `EV / EBITDA: ${evEbitda}`;
+            metricDetails[symbol]['price_to_fcf'] = `Price to FCF: ${priceToFCF}`;
+            metricDetails[symbol]['ev_fcf'] = `EV / FCF: ${evFCF}`;
+            metricDetails[symbol]['sales_growth_1yr'] = `TTM Rev Growth: ${sales1Yr}`;
+            metricDetails[symbol]['sales_growth_3yr'] = `3-Yr Rev Growth: ${sales3Yr.value}`;
+            metricDetails[symbol]['sales_growth_5yr'] = `5-Yr Rev Growth: ${sales5Yr.value}`;
+            metricDetails[symbol]['eps_growth_1yr'] = `Current Yr Exp EPS Growth: ${eps1Yr}`;
+            metricDetails[symbol]['eps_growth_3yr'] = `3-Yr EPS Growth: ${eps3Yr.value}`;
+            metricDetails[symbol]['eps_growth_5yr'] = `5-Yr EPS Growth: ${eps5Yr.value}`;
+            metricDetails[symbol]['ebitda_growth_1yr'] = `Next Yr Exp Rev Growth: ${ebitda1Yr}`;
+            metricDetails[symbol]['ebitda_growth_3yr'] = `3-Yr EBITDA Growth: ${ebitda3Yr.value}`;
+            metricDetails[symbol]['ebitda_growth_5yr'] = `5-Yr EBITDA Growth: ${ebitda5Yr.value}`;
+            metricDetails[symbol]['gross_margin'] = `Gross Margin: ${grossMargin}`;
+            metricDetails[symbol]['gross_margin_1yr_change'] = `Gross Margin 1-Yr Change: ${grossMargin1Yr}`;
+            metricDetails[symbol]['gross_margin_3yr_change'] = `Gross Margin 3-Yr Change: ${grossMargin3Yr}`;
+            metricDetails[symbol]['gross_margin_5yr_change'] = `Gross Margin 5-Yr Change: ${grossMargin5Yr}`;
+            metricDetails[symbol]['operating_margin'] = `Net Margin: ${netMargin}`;
+            metricDetails[symbol]['operating_margin_1yr_change'] = `Net Margin 1-Yr Change: ${netMargin1Yr}`;
+            metricDetails[symbol]['operating_margin_3yr_change'] = `Net Margin 3-Yr Change: ${netMargin3Yr}`;
+            metricDetails[symbol]['operating_margin_5yr_change'] = `Net Margin 5-Yr Change: ${netMargin5Yr}`;
+            metricDetails[symbol]['net_margin'] = `Operating Margin: ${operatingMargin}`;
+            metricDetails[symbol]['net_margin_1yr_change'] = `Operating Margin 1-Yr Change: ${operatingMargin1Yr}`;
+            metricDetails[symbol]['net_margin_3yr_change'] = `Operating Margin 3-Yr Change: ${operatingMargin3Yr}`;
+            metricDetails[symbol]['net_margin_5yr_change'] = `Operating Margin 5-Yr Change: ${operatingMargin5Yr}`;
+            metricDetails[symbol]['rsi'] = `RSI: ${rsi}`;
+            metricDetails[symbol]['mfi'] = `MFI: ${mfi}`;
+            metricDetails[symbol]['price_vs_52wk_high'] = `Price vs 52-Wk High: ${priceVs52WkHigh}`;
+            metricDetails[symbol]['price_vs_52wk_low'] = `Price vs 52-Wk Low: ${priceVs52WkLow}`;
+            metricDetails[symbol]['bollinger_percent_20'] = `Bollinger Percent 20: ${bollinger20}`;
+            metricDetails[symbol]['bollinger_percent_50'] = `Bollinger Percent 50: ${bollinger50}`;
+            metricDetails[symbol]['price_vs_50day_avg'] = `Price vs 50-Day Avg: ${priceVs50DayAvg}`;
+            metricDetails[symbol]['price_vs_200day_avg'] = `Price vs 200-Day Avg: ${priceVs200DayAvg}`;
+
+            return { symbol, currentPrice: currentPriceFinal, marketCap, peTTM, peForward, priceToSales, priceToBook, evEbitda, priceToFCF, evFCF,
+                sales1Yr, sales3Yr: sales3Yr.value, sales5Yr: sales5Yr.value,
+                eps1Yr, eps3Yr: eps3Yr.value, eps5Yr: eps5Yr.value,
+                ebitda1Yr, ebitda3Yr: ebitda3Yr.value, ebitda5Yr: ebitda5Yr.value,
+                grossMargin, grossMargin1Yr, grossMargin3Yr, grossMargin5Yr,
+                operatingMargin, operatingMargin1Yr, operatingMargin3Yr, operatingMargin5Yr,
+                netMargin, netMargin1Yr, netMargin3Yr, netMargin5Yr,
+                rsi, mfi, priceVs52WkHigh, priceVs52WkLow, bollinger20, bollinger50, priceVs50DayAvg, priceVs200DayAvg };
         });
+    });
+
+    Promise.all(tickerPromises)
+    .then(results => {
+        const resultsDiv = document.getElementById('results');
+        resultsDiv.innerHTML = '';
+        results.forEach(data => {
+            const column = `
+                <div class="ticker-column">
+                    <h2 class="text-warning">${data.symbol}</h2>
+                    <div class="prominent-metric">
+                        Stock Price: $${data.currentPrice.toFixed(2)} | Market Cap: $${(data.marketCap / 1e9).toFixed(2)}B
+                    </div>
+                    <div class="metric-box"><span>TTM PE</span><span class="value">${data.peTTM}</span><span class="comparison">Many Stocks Trade At 20-28</span></div>
+                    <div class="metric-box"><span>Forward PE</span><span class="value">${data.peForward}</span><span class="comparison">Many Stocks Trade At 18-26</span></div>
+                    <div class="metric-box"><span>2 Year Forward PE</span><span class="value">22.07</span><span class="comparison">Many Stocks Trade At 16-24</span></div>
+                    <div class="metric-box"><span>TTM EPS Growth</span><span class="value">${data.eps1Yr}</span><span class="comparison">Many Stocks Trade At 8-12%</span></div>
+                    <div class="metric-box"><span>Current Yr Exp EPS Growth</span><span class="value">${data.eps3Yr}</span><span class="comparison">Many Stocks Trade At 8-12%</span></div>
+                    <div class="metric-box"><span>Next Year EPS Growth</span><span class="value">${data.eps5Yr}</span><span class="comparison">Many Stocks Trade At 8-12%</span></div>
+                    <div class="metric-box"><span>TTM Rev Growth</span><span class="value">${data.sales1Yr}</span><span class="comparison">Many Stocks Trade At 4.5-5.5%</span></div>
+                    <div class="metric-box"><span>Current Yr Exp Rev Growth</span><span class="value">${data.sales3Yr}</span><span class="comparison">Many Stocks Trade At 4.5-5.5%</span></div>
+                    <div class="metric-box"><span>Next Year Rev Growth</span><span class="value">${data.sales5Yr}</span><span class="comparison">Many Stocks Trade At 4.5-5.5%</span></div>
+                    <div class="metric-box"><span>Gross Margin</span><span class="value">${data.grossMargin}</span><span class="comparison">Many Stocks Trade At 40-48%</span></div>
+                    <div class="metric-box"><span>Net Margin</span><span class="value">${data.netMargin}</span><span class="comparison">Many Stocks Trade At 8-10%</span></div>
+                    <div class="metric-box"><span>TTM P/S Ratio</span><span class="value">${data.priceToSales}</span><span class="comparison">Many Stocks Trade At 1.8-2.6</span></div>
+                    <div class="metric-box"><span>Forward P/S Ratio</span><span class="value">${data.priceToSales}</span><span class="comparison">Many Stocks Trade At 1.8-2.6</span></div>
+                </div>
+            `;
+            resultsDiv.innerHTML += column;
+        });
+    })
+    .catch(error => {
+        console.error('Error:', error.message);
+        if (error.message.includes('rate limit')) {
+            alert('API rate limit exceeded (25 requests/day). Wait until tomorrow or upgrade at alphavantage.co/premium.');
+        } else {
+            alert(`Error: ${error.message}. Check console for details.`);
+        }
+    })
+    .finally(() => {
+        document.getElementById('loading').style.display = 'none';
+        fetchBtn.disabled = false;
+        setTimeout(() => { isFetching = false; }, 15000);
+    });
 }
+
+function clearResults() {
+    document.getElementById('results').innerHTML = '';
+    metricDetails = {};
+}
+
+document.getElementById('fetchBtn').addEventListener('click', fetchData);
