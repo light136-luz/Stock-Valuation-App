@@ -84,8 +84,9 @@ function openChartWindow(symbol, metricId) {
     const metricName = document.getElementById(`${symbol}_${metricId}`).innerText.split(':')[0];
     const chartWindow = window.open('', '_blank', 'width=800,height=600');
     const chartJsScript = `
-        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     `;
+    const initialData = getChartData(symbol, metricId, 'yearly');
     chartWindow.document.write(`
         <!DOCTYPE html>
         <html>
@@ -123,7 +124,7 @@ function openChartWindow(symbol, metricId) {
                         data: {
                             labels: data.labels,
                             datasets: [{
-                                label: metricName,
+                                label: '${metricName}',
                                 data: data.values,
                                 borderColor: '#ff8c00',
                                 fill: false
@@ -132,7 +133,7 @@ function openChartWindow(symbol, metricId) {
                         options: {
                             scales: {
                                 x: { title: { display: true, text: 'Date', color: '#fff' }, ticks: { color: '#fff' } },
-                                y: { title: { display: true, text: metricName, color: '#fff' }, ticks: { color: '#fff' } }
+                                y: { title: { display: true, text: '${metricName}', color: '#fff' }, ticks: { color: '#fff' } }
                             },
                             plugins: {
                                 legend: { labels: { color: '#fff' } }
