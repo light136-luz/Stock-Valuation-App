@@ -6,54 +6,117 @@
     <title>Stock Valuation App</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        #loading { display: none; text-align: center; margin: 20px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background-color: #f2f2f2; }
-        .metric-label { font-weight: bold; }
+        body {
+            background-color: #1a1a1a;
+            color: #fff;
+            font-family: Arial, sans-serif;
+        }
+        .container {
+            max-width: 1200px;
+            padding: 20px;
+        }
+        .search-box {
+            background-color: #ffcc00;
+            color: #1a1a1a;
+            padding: 10px 20px;
+            border-radius: 20px;
+            display: inline-flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .search-box input {
+            background: transparent;
+            border: none;
+            color: #1a1a1a;
+            margin-left: 10px;
+            width: 200px;
+        }
+        .search-box input::placeholder {
+            color: #1a1a1a;
+        }
+        .search-box button {
+            background: transparent;
+            border: none;
+            color: #1a1a1a;
+            cursor: pointer;
+        }
+        #loading {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+        .ticker-section {
+            background: url('https://via.placeholder.com/1200x800') no-repeat center center;
+            background-size: cover;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .ticker-column {
+            flex: 1;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 10px;
+        }
+        .metric-box {
+            background-color: #fff;
+            color: #1a1a1a;
+            padding: 10px;
+            margin-bottom: 5px;
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .metric-box .value {
+            font-weight: bold;
+            color: #ffcc00;
+        }
+        .metric-box .comparison {
+            color: #ccc;
+            font-size: 0.8em;
+        }
+        .prominent-metric {
+            font-size: 1.2em;
+            background-color: #ffcc00;
+            color: #1a1a1a;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .metric {
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
-    <div class="container mt-5">
-        <h1 class="text-center">Stock Valuation App</h1>
-        <div class="row mb-3">
-            <div class="col">
-                <input type="text" id="symbol1" class="form-control" placeholder="Ticker 1 (e.g., AMD)">
+    <div class="container">
+        <div class="text-center mb-4">
+            <img src="https://via.placeholder.com/100x50" alt="1000xStocks Logo" class="mb-2">
+            <div class="search-box">
+                <span>SEARCH STOCK</span>
+                <input type="text" id="symbols" placeholder="e.g., AMD, NVDA, TSLA">
+                <button id="fetchBtn"><span class="visually-hidden">Search</span>🔍</button>
             </div>
-            <div class="col">
-                <input type="text" id="symbol2" class="form-control" placeholder="Ticker 2 (e.g., NVDA)">
-            </div>
-            <div class="col">
-                <input type="text" id="symbol3" class="form-control" placeholder="Ticker 3 (e.g., TSLA)">
-            </div>
-            <div class="col">
-                <input type="text" id="symbol4" class="form-control" placeholder="Ticker 4 (e.g., AAPL)">
-            </div>
-            <div class="col">
-                <input type="text" id="symbol5" class="form-control" placeholder="Ticker 5 (e.g., MSFT)">
-            </div>
-        </div>
-        <div class="text-center">
-            <button id="fetchBtn" class="btn btn-primary" onclick="fetchData()">Fetch Data</button>
+            <img src="https://via.placeholder.com/100x50" alt="1000xStocks Logo" class="mt-2">
         </div>
         <div id="loading">
-            <div class="spinner-border" role="status">
-                <span class="visually-hidden">Loading...</span>
+            <div class="spinner-border text-warning" role="status"><span class="visually-hidden">Loading...</span></div>
+        </div>
+        <div id="results" class="ticker-section d-flex justify-content-between"></div>
+    </div>
+
+    <!-- Modal for Details -->
+    <div class="modal fade" id="metricModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="metricModalLabel"></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="metricDetails"></div>
             </div>
         </div>
-        <table id="resultsTable">
-            <thead>
-                <tr>
-                    <th>Metric</th>
-                    <th id="ticker1">Ticker 1</th>
-                    <th id="ticker2">Ticker 2</th>
-                    <th id="ticker3">Ticker 3</th>
-                    <th id="ticker4">Ticker 4</th>
-                    <th id="ticker5">Ticker 5</th>
-                </tr>
-            </thead>
-            <tbody id="resultsBody"></tbody>
-        </table>
     </div>
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
